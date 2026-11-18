@@ -1,0 +1,761 @@
+{
+  "decrypt/kms_grant": [
+    {
+      "title": "Internet-facing ECS service can use KMS to decrypt",
+      "category": "Information Disclosure",
+      "severity": "high",
+      "affected_resources": [
+        "aws_lb.public",
+        "aws_lb_listener.https",
+        "aws_lb_target_group.orders",
+        "aws_ecs_service.orders",
+        "aws_ecs_task_definition.orders",
+        "aws_iam_role.orders_task",
+        "aws_kms_key.data"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->aws_lb.public",
+      "rationale": "aws_ecs_service.orders is reachable through an internet-facing load balancer and its ECS task role has deterministic kms:Decrypt authority on 1 exact modeled KMS key(s) through grant. A compromise of the public workload could attempt KMS decrypt operations, creating information-disclosure potential. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext or can disclose plaintext. No resolved KMS-protected S3 access convergence is modeled for these keys. The KMS key itself is not public.",
+      "recommended_mitigation": "Reduce public ingress to the ECS service and restrict the task role to only the exact KMS decrypt operations and key ARNs required at runtime. Keep key-policy delegation, IAM permissions, and KMS grants narrowly scoped, and separate cryptographic identities from internet-facing application roles.",
+      "rule_id": "aws-public-ecs-kms-decrypt-access",
+      "evidence": [
+        {
+          "key": "network_path",
+          "values": [
+            "internet reaches aws_lb.public through aws_lb_listener.https (HTTPS TCP 443)",
+            "aws_lb_listener.https forwards through aws_lb_target_group.orders to aws_ecs_service.orders container=orders (HTTP TCP 8080)"
+          ]
+        },
+        {
+          "key": "public_ingress",
+          "values": [
+            "listener=aws_lb_listener.https; action_source=aws_lb_listener.https; target_group=aws_lb_target_group.orders; service=aws_ecs_service.orders; container=orders:8080; target_weight=1; conditions=[]; request_witness={\"host_header\":\"a.example\",\"http_request_method\":\"DELETE\",\"path_pattern\":\"/\"}; authentication_actions=[]; evaluation_scope=modeled_listener_container_and_security_group_permissions"
+          ]
+        },
+        {
+          "key": "network_permissions",
+          "values": [
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=container_binding; state=allowed; evidence={\"container_name\":\"orders\",\"container_port\":8080,\"network_mode\":\"awsvpc\",\"protocol\":\"tcp\",\"task_definition_address\":\"aws_ecs_task_definition.orders\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=listener_ingress; state=allowed; evidence={\"cidr\":\"0.0.0.0/0\",\"internet_source_witness\":\"8.8.8.8\",\"port\":443,\"protocol\":\"tcp\",\"rule_direction\":\"ingress\",\"rule_path\":[\"ingress\",0],\"rule_source_address\":\"aws_security_group.public_alb\",\"security_group_address\":\"aws_security_group.public_alb\",\"selector\":\"cidr\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=load_balancer_egress; state=allowed; evidence={\"peer_security_group_addresses\":[\"aws_security_group.public_tasks\"],\"port\":8080,\"protocol\":\"tcp\",\"rule_direction\":\"egress\",\"rule_path\":[\"egress\",0],\"rule_source_address\":\"aws_security_group.public_alb\",\"security_group_address\":\"aws_security_group.public_alb\",\"selector\":\"security_group\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=service_ingress; state=allowed; evidence={\"peer_security_group_addresses\":[\"aws_security_group.public_alb\"],\"port\":8080,\"protocol\":\"tcp\",\"rule_direction\":\"ingress\",\"rule_path\":[\"ingress\",0],\"rule_source_address\":\"aws_security_group.public_tasks\",\"security_group_address\":\"aws_security_group.public_tasks\",\"selector\":\"security_group\"}"
+          ]
+        },
+        {
+          "key": "task_definitions",
+          "values": [
+            "address=aws_ecs_task_definition.orders"
+          ]
+        },
+        {
+          "key": "task_roles",
+          "values": [
+            "address=aws_iam_role.orders_task; arn=arn:aws:iam::111122223333:role/orders-task; role_kind=ecs_task_role; credential_context=workload_runtime; role_policy_complete=true"
+          ]
+        },
+        {
+          "key": "kms_operation_paths",
+          "values": [
+            "key_address=aws_kms_key.data; key_arn=arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; key_id=11111111-1111-1111-1111-111111111111; key_usage=ENCRYPT_DECRYPT; key_spec=SYMMETRIC_DEFAULT; operation=kms:Decrypt; task_definition=aws_ecs_task_definition.orders; task_role=aws_iam_role.orders_task; authorization_state=allowed; authorization_bases=grant; candidate_authorization_bases=grant; policy_action_patterns=; policy_resources=; deny_action_patterns=none; key_policy_sources=aws_kms_key.data; identity_policy_sources=aws_iam_role.orders_task; grant_sources=aws_kms_grant.runtime; grant_constraints={\"encryption_context_equals\": {\"service\": \"orders\"}}; constraint_state=encryption_context; operation_evaluation=deterministic_allowed"
+          ]
+        },
+        {
+          "key": "assessment_scope",
+          "values": [
+            "establishes=deterministic kms:Decrypt authority for an ECS task role on exact modeled KMS keys",
+            "does_not_establish=useful ciphertext, plaintext disclosure, accepted application signatures or MACs, or runtime success outside the modeled AWS policy and grant evidence"
+          ]
+        },
+        {
+          "key": "downstream_dependencies",
+          "values": [
+            "unique_dependency_count=0; unique_dependent_resource_count=0; downstream_dependency_state=no_resolved_dependents"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 1,
+        "data_sensitivity": 2,
+        "lateral_movement": 1,
+        "blast_radius": 1,
+        "final_score": 7,
+        "severity": "high",
+        "computed_severity": null
+      }
+    }
+  ],
+  "create_grant/kms_grant": [
+    {
+      "title": "Internet-facing ECS service can delegate KMS authorization",
+      "category": "Elevation of Privilege",
+      "severity": "high",
+      "affected_resources": [
+        "aws_lb.public",
+        "aws_lb_listener.https",
+        "aws_lb_target_group.orders",
+        "aws_ecs_service.orders",
+        "aws_ecs_task_definition.orders",
+        "aws_iam_role.orders_task",
+        "aws_kms_key.data"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->aws_lb.public",
+      "rationale": "aws_ecs_service.orders is reachable through an internet-facing load balancer and its ECS task role has deterministic KMS authorization-delegation authority (kms:CreateGrant) on 1 exact modeled KMS key(s) through grant. A compromise of the public workload could change KMS authorization or delegate further key authority through those operations. This establishes cryptographic key-management authority, not proof that the operation will succeed outside the modeled AWS policy, grant, and key-state evidence. The KMS key itself is not public.",
+      "recommended_mitigation": "Reduce public ingress to the ECS service and remove KMS key-policy and grant administration from internet-facing task roles where possible. Restrict any required delegation to exact keys and narrow grant or key-policy operations, and use separate operational identities for authorization changes.",
+      "rule_id": "aws-public-ecs-kms-authorization-delegation",
+      "evidence": [
+        {
+          "key": "network_path",
+          "values": [
+            "internet reaches aws_lb.public through aws_lb_listener.https (HTTPS TCP 443)",
+            "aws_lb_listener.https forwards through aws_lb_target_group.orders to aws_ecs_service.orders container=orders (HTTP TCP 8080)"
+          ]
+        },
+        {
+          "key": "public_ingress",
+          "values": [
+            "listener=aws_lb_listener.https; action_source=aws_lb_listener.https; target_group=aws_lb_target_group.orders; service=aws_ecs_service.orders; container=orders:8080; target_weight=1; conditions=[]; request_witness={\"host_header\":\"a.example\",\"http_request_method\":\"DELETE\",\"path_pattern\":\"/\"}; authentication_actions=[]; evaluation_scope=modeled_listener_container_and_security_group_permissions"
+          ]
+        },
+        {
+          "key": "network_permissions",
+          "values": [
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=container_binding; state=allowed; evidence={\"container_name\":\"orders\",\"container_port\":8080,\"network_mode\":\"awsvpc\",\"protocol\":\"tcp\",\"task_definition_address\":\"aws_ecs_task_definition.orders\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=listener_ingress; state=allowed; evidence={\"cidr\":\"0.0.0.0/0\",\"internet_source_witness\":\"8.8.8.8\",\"port\":443,\"protocol\":\"tcp\",\"rule_direction\":\"ingress\",\"rule_path\":[\"ingress\",0],\"rule_source_address\":\"aws_security_group.public_alb\",\"security_group_address\":\"aws_security_group.public_alb\",\"selector\":\"cidr\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=load_balancer_egress; state=allowed; evidence={\"peer_security_group_addresses\":[\"aws_security_group.public_tasks\"],\"port\":8080,\"protocol\":\"tcp\",\"rule_direction\":\"egress\",\"rule_path\":[\"egress\",0],\"rule_source_address\":\"aws_security_group.public_alb\",\"security_group_address\":\"aws_security_group.public_alb\",\"selector\":\"security_group\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=service_ingress; state=allowed; evidence={\"peer_security_group_addresses\":[\"aws_security_group.public_alb\"],\"port\":8080,\"protocol\":\"tcp\",\"rule_direction\":\"ingress\",\"rule_path\":[\"ingress\",0],\"rule_source_address\":\"aws_security_group.public_tasks\",\"security_group_address\":\"aws_security_group.public_tasks\",\"selector\":\"security_group\"}"
+          ]
+        },
+        {
+          "key": "task_definitions",
+          "values": [
+            "address=aws_ecs_task_definition.orders"
+          ]
+        },
+        {
+          "key": "task_roles",
+          "values": [
+            "address=aws_iam_role.orders_task; arn=arn:aws:iam::111122223333:role/orders-task; role_kind=ecs_task_role; credential_context=workload_runtime; role_policy_complete=true"
+          ]
+        },
+        {
+          "key": "kms_management_paths",
+          "values": [
+            "key_address=aws_kms_key.data; key_arn=arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; key_id=11111111-1111-1111-1111-111111111111; key_usage=ENCRYPT_DECRYPT; key_origin=AWS_KMS; operation=kms:CreateGrant; operation_class=authorization_administration; management_effect=delegation; task_definition=aws_ecs_task_definition.orders; task_role=aws_iam_role.orders_task; authorization_state=allowed; authorization_bases=grant; candidate_authorization_bases=grant; policy_action_patterns=; policy_resources=; deny_action_patterns=none; key_policy_sources=aws_kms_key.data; identity_policy_sources=aws_iam_role.orders_task; grant_sources=aws_kms_grant.runtime; grant_constraints={\"encryption_context_equals\": {\"service\": \"orders\"}}; constraint_state=encryption_context; conditional_policy_evidence_present=false; authorization_requires_condition_evaluation=false; key_origin_compatibility=not_applicable; operation_evaluation=deterministic_allowed"
+          ]
+        },
+        {
+          "key": "assessment_scope",
+          "values": [
+            "establishes=deterministic kms:CreateGrant authority for ECS task roles with authorization delegation effect on exact modeled KMS keys",
+            "does_not_establish=successful operation completion, authority over keys outside the modeled plan, or runtime impact beyond the preserved AWS policy, grant, and key-state evidence"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 2,
+        "data_sensitivity": 1,
+        "lateral_movement": 1,
+        "blast_radius": 1,
+        "final_score": 7,
+        "severity": "high",
+        "computed_severity": null
+      }
+    }
+  ],
+  "mixed": [
+    {
+      "title": "Internet-facing ECS service can use KMS to decrypt",
+      "category": "Information Disclosure",
+      "severity": "high",
+      "affected_resources": [
+        "aws_lb.public",
+        "aws_lb_listener.https",
+        "aws_lb_target_group.orders",
+        "aws_ecs_service.orders",
+        "aws_ecs_task_definition.orders",
+        "aws_iam_role.orders_task",
+        "aws_kms_key.data"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->aws_lb.public",
+      "rationale": "aws_ecs_service.orders is reachable through an internet-facing load balancer and its ECS task role has deterministic kms:Decrypt authority on 1 exact modeled KMS key(s) through iam_via_key_policy, key_policy_direct. A compromise of the public workload could attempt KMS decrypt operations, creating information-disclosure potential. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext or can disclose plaintext. No resolved KMS-protected S3 access convergence is modeled for these keys. The KMS key itself is not public.",
+      "recommended_mitigation": "Reduce public ingress to the ECS service and restrict the task role to only the exact KMS decrypt operations and key ARNs required at runtime. Keep key-policy delegation, IAM permissions, and KMS grants narrowly scoped, and separate cryptographic identities from internet-facing application roles.",
+      "rule_id": "aws-public-ecs-kms-decrypt-access",
+      "evidence": [
+        {
+          "key": "network_path",
+          "values": [
+            "internet reaches aws_lb.public through aws_lb_listener.https (HTTPS TCP 443)",
+            "aws_lb_listener.https forwards through aws_lb_target_group.orders to aws_ecs_service.orders container=orders (HTTP TCP 8080)"
+          ]
+        },
+        {
+          "key": "public_ingress",
+          "values": [
+            "listener=aws_lb_listener.https; action_source=aws_lb_listener.https; target_group=aws_lb_target_group.orders; service=aws_ecs_service.orders; container=orders:8080; target_weight=1; conditions=[]; request_witness={\"host_header\":\"a.example\",\"http_request_method\":\"DELETE\",\"path_pattern\":\"/\"}; authentication_actions=[]; evaluation_scope=modeled_listener_container_and_security_group_permissions"
+          ]
+        },
+        {
+          "key": "network_permissions",
+          "values": [
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=container_binding; state=allowed; evidence={\"container_name\":\"orders\",\"container_port\":8080,\"network_mode\":\"awsvpc\",\"protocol\":\"tcp\",\"task_definition_address\":\"aws_ecs_task_definition.orders\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=listener_ingress; state=allowed; evidence={\"cidr\":\"0.0.0.0/0\",\"internet_source_witness\":\"8.8.8.8\",\"port\":443,\"protocol\":\"tcp\",\"rule_direction\":\"ingress\",\"rule_path\":[\"ingress\",0],\"rule_source_address\":\"aws_security_group.public_alb\",\"security_group_address\":\"aws_security_group.public_alb\",\"selector\":\"cidr\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=load_balancer_egress; state=allowed; evidence={\"peer_security_group_addresses\":[\"aws_security_group.public_tasks\"],\"port\":8080,\"protocol\":\"tcp\",\"rule_direction\":\"egress\",\"rule_path\":[\"egress\",0],\"rule_source_address\":\"aws_security_group.public_alb\",\"security_group_address\":\"aws_security_group.public_alb\",\"selector\":\"security_group\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=service_ingress; state=allowed; evidence={\"peer_security_group_addresses\":[\"aws_security_group.public_alb\"],\"port\":8080,\"protocol\":\"tcp\",\"rule_direction\":\"ingress\",\"rule_path\":[\"ingress\",0],\"rule_source_address\":\"aws_security_group.public_tasks\",\"security_group_address\":\"aws_security_group.public_tasks\",\"selector\":\"security_group\"}"
+          ]
+        },
+        {
+          "key": "task_definitions",
+          "values": [
+            "address=aws_ecs_task_definition.orders"
+          ]
+        },
+        {
+          "key": "task_roles",
+          "values": [
+            "address=aws_iam_role.orders_task; arn=arn:aws:iam::111122223333:role/orders-task; role_kind=ecs_task_role; credential_context=workload_runtime; role_policy_complete=true"
+          ]
+        },
+        {
+          "key": "kms_operation_paths",
+          "values": [
+            "key_address=aws_kms_key.data; key_arn=arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; key_id=11111111-1111-1111-1111-111111111111; key_usage=ENCRYPT_DECRYPT; key_spec=SYMMETRIC_DEFAULT; operation=kms:Decrypt; task_definition=aws_ecs_task_definition.orders; task_role=aws_iam_role.orders_task; authorization_state=allowed; authorization_bases=key_policy_direct,iam_via_key_policy; candidate_authorization_bases=key_policy_direct,iam_via_key_policy; policy_action_patterns=kms:Decrypt; policy_resources=*,arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; deny_action_patterns=none; key_policy_sources=aws_kms_key.data; identity_policy_sources=aws_iam_role.orders_task; grant_sources=none; grant_constraints=none; constraint_state=not_applicable; operation_evaluation=deterministic_allowed"
+          ]
+        },
+        {
+          "key": "assessment_scope",
+          "values": [
+            "establishes=deterministic kms:Decrypt authority for an ECS task role on exact modeled KMS keys",
+            "does_not_establish=useful ciphertext, plaintext disclosure, accepted application signatures or MACs, or runtime success outside the modeled AWS policy and grant evidence"
+          ]
+        },
+        {
+          "key": "downstream_dependencies",
+          "values": [
+            "unique_dependency_count=0; unique_dependent_resource_count=0; downstream_dependency_state=no_resolved_dependents"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 1,
+        "data_sensitivity": 2,
+        "lateral_movement": 1,
+        "blast_radius": 1,
+        "final_score": 7,
+        "severity": "high",
+        "computed_severity": null
+      }
+    },
+    {
+      "title": "Internet-facing ECS service can use KMS to sign or generate MACs",
+      "category": "Spoofing",
+      "severity": "high",
+      "affected_resources": [
+        "aws_lb.public",
+        "aws_lb_listener.https",
+        "aws_lb_target_group.orders",
+        "aws_ecs_service.orders",
+        "aws_ecs_task_definition.orders",
+        "aws_iam_role.orders_task",
+        "aws_kms_key.mac",
+        "aws_kms_key.signing"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->aws_lb.public",
+      "rationale": "aws_ecs_service.orders is reachable through an internet-facing load balancer and its ECS task role has deterministic kms:Sign and kms:GenerateMac authority on 2 exact modeled KMS key(s) through key_policy_direct. A compromise of the public workload could generate KMS signatures or message authentication codes, creating spoofing potential. This establishes cryptographic-operation authority, not proof that the workload can produce a valid signature or message authentication code accepted by a relying system. The KMS key itself is not public.",
+      "recommended_mitigation": "Reduce public ingress to the ECS service and restrict the task role to only the exact KMS signing or MAC-generation operations and key ARNs required at runtime. Keep signing and MAC keys and authorization sources separate from internet-facing application roles, and require explicit relying-party validation controls.",
+      "rule_id": "aws-public-ecs-kms-signing-access",
+      "evidence": [
+        {
+          "key": "network_path",
+          "values": [
+            "internet reaches aws_lb.public through aws_lb_listener.https (HTTPS TCP 443)",
+            "aws_lb_listener.https forwards through aws_lb_target_group.orders to aws_ecs_service.orders container=orders (HTTP TCP 8080)"
+          ]
+        },
+        {
+          "key": "public_ingress",
+          "values": [
+            "listener=aws_lb_listener.https; action_source=aws_lb_listener.https; target_group=aws_lb_target_group.orders; service=aws_ecs_service.orders; container=orders:8080; target_weight=1; conditions=[]; request_witness={\"host_header\":\"a.example\",\"http_request_method\":\"DELETE\",\"path_pattern\":\"/\"}; authentication_actions=[]; evaluation_scope=modeled_listener_container_and_security_group_permissions"
+          ]
+        },
+        {
+          "key": "network_permissions",
+          "values": [
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=container_binding; state=allowed; evidence={\"container_name\":\"orders\",\"container_port\":8080,\"network_mode\":\"awsvpc\",\"protocol\":\"tcp\",\"task_definition_address\":\"aws_ecs_task_definition.orders\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=listener_ingress; state=allowed; evidence={\"cidr\":\"0.0.0.0/0\",\"internet_source_witness\":\"8.8.8.8\",\"port\":443,\"protocol\":\"tcp\",\"rule_direction\":\"ingress\",\"rule_path\":[\"ingress\",0],\"rule_source_address\":\"aws_security_group.public_alb\",\"security_group_address\":\"aws_security_group.public_alb\",\"selector\":\"cidr\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=load_balancer_egress; state=allowed; evidence={\"peer_security_group_addresses\":[\"aws_security_group.public_tasks\"],\"port\":8080,\"protocol\":\"tcp\",\"rule_direction\":\"egress\",\"rule_path\":[\"egress\",0],\"rule_source_address\":\"aws_security_group.public_alb\",\"security_group_address\":\"aws_security_group.public_alb\",\"selector\":\"security_group\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=service_ingress; state=allowed; evidence={\"peer_security_group_addresses\":[\"aws_security_group.public_alb\"],\"port\":8080,\"protocol\":\"tcp\",\"rule_direction\":\"ingress\",\"rule_path\":[\"ingress\",0],\"rule_source_address\":\"aws_security_group.public_tasks\",\"security_group_address\":\"aws_security_group.public_tasks\",\"selector\":\"security_group\"}"
+          ]
+        },
+        {
+          "key": "task_definitions",
+          "values": [
+            "address=aws_ecs_task_definition.orders"
+          ]
+        },
+        {
+          "key": "task_roles",
+          "values": [
+            "address=aws_iam_role.orders_task; arn=arn:aws:iam::111122223333:role/orders-task; role_kind=ecs_task_role; credential_context=workload_runtime; role_policy_complete=true"
+          ]
+        },
+        {
+          "key": "kms_operation_paths",
+          "values": [
+            "key_address=aws_kms_key.mac; key_arn=arn:aws:kms:us-east-1:111122223333:key/33333333-3333-3333-3333-333333333333; key_id=33333333-3333-3333-3333-333333333333; key_usage=GENERATE_VERIFY_MAC; key_spec=HMAC_256; operation=kms:GenerateMac; task_definition=aws_ecs_task_definition.orders; task_role=aws_iam_role.orders_task; authorization_state=allowed; authorization_bases=key_policy_direct; candidate_authorization_bases=key_policy_direct; policy_action_patterns=kms:GenerateMac; policy_resources=*; deny_action_patterns=none; key_policy_sources=aws_kms_key.mac; identity_policy_sources=aws_iam_role.orders_task; grant_sources=none; grant_constraints=none; constraint_state=not_applicable; operation_evaluation=deterministic_allowed",
+            "key_address=aws_kms_key.signing; key_arn=arn:aws:kms:us-east-1:111122223333:key/22222222-2222-2222-2222-222222222222; key_id=22222222-2222-2222-2222-222222222222; key_usage=SIGN_VERIFY; key_spec=RSA_2048; operation=kms:Sign; task_definition=aws_ecs_task_definition.orders; task_role=aws_iam_role.orders_task; authorization_state=allowed; authorization_bases=key_policy_direct; candidate_authorization_bases=key_policy_direct; policy_action_patterns=kms:Sign; policy_resources=*; deny_action_patterns=none; key_policy_sources=aws_kms_key.signing; identity_policy_sources=aws_iam_role.orders_task; grant_sources=none; grant_constraints=none; constraint_state=not_applicable; operation_evaluation=deterministic_allowed"
+          ]
+        },
+        {
+          "key": "assessment_scope",
+          "values": [
+            "establishes=deterministic kms:Sign and kms:GenerateMac authority for an ECS task role on exact modeled KMS keys",
+            "does_not_establish=useful ciphertext, plaintext disclosure, accepted application signatures or MACs, or runtime success outside the modeled AWS policy and grant evidence"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 1,
+        "data_sensitivity": 1,
+        "lateral_movement": 1,
+        "blast_radius": 2,
+        "final_score": 7,
+        "severity": "high",
+        "computed_severity": null
+      }
+    },
+    {
+      "title": "Internet-facing ECS service can disrupt KMS keys",
+      "category": "Denial of Service",
+      "severity": "high",
+      "affected_resources": [
+        "aws_lb.public",
+        "aws_lb_listener.https",
+        "aws_lb_target_group.orders",
+        "aws_ecs_service.orders",
+        "aws_ecs_task_definition.orders",
+        "aws_iam_role.orders_task",
+        "aws_kms_key.data"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->aws_lb.public",
+      "rationale": "aws_ecs_service.orders is reachable through an internet-facing load balancer and its ECS task role has deterministic KMS key-disruption authority (kms:DisableKey and kms:ScheduleKeyDeletion and kms:DeleteImportedKeyMaterial) on 1 exact modeled KMS key(s) through iam_via_key_policy, key_policy_direct. A compromise of the public workload could disrupt KMS-backed data or cryptographic availability through those operations. No resolved downstream encrypted dependent resources are modeled for these keys. Recovery-window evidence: key_address=aws_kms_key.data; operation=kms:ScheduleKeyDeletion; deletion_window_in_days=30; recovery_window_state=cancelable_scheduled_deletion, key_address=aws_kms_key.data; operation=kms:DisableKey; recovery_window_state=not_governed_by_deletion_window, key_address=aws_kms_key.data; operation=kms:DeleteImportedKeyMaterial; recovery_window_state=not_governed_by_deletion_window. This establishes cryptographic key-management authority, not proof that the operation will succeed outside the modeled AWS policy, grant, and key-state evidence. The KMS key itself is not public.",
+      "recommended_mitigation": "Reduce public ingress to the ECS service and restrict the task role to only the exact KMS key disruption operations and key ARNs required at runtime. Keep disable, deletion, and imported-key material controls with separate operational identities, and preserve recovery windows for dependent encrypted data.",
+      "rule_id": "aws-public-ecs-kms-key-disruption",
+      "evidence": [
+        {
+          "key": "network_path",
+          "values": [
+            "internet reaches aws_lb.public through aws_lb_listener.https (HTTPS TCP 443)",
+            "aws_lb_listener.https forwards through aws_lb_target_group.orders to aws_ecs_service.orders container=orders (HTTP TCP 8080)"
+          ]
+        },
+        {
+          "key": "public_ingress",
+          "values": [
+            "listener=aws_lb_listener.https; action_source=aws_lb_listener.https; target_group=aws_lb_target_group.orders; service=aws_ecs_service.orders; container=orders:8080; target_weight=1; conditions=[]; request_witness={\"host_header\":\"a.example\",\"http_request_method\":\"DELETE\",\"path_pattern\":\"/\"}; authentication_actions=[]; evaluation_scope=modeled_listener_container_and_security_group_permissions"
+          ]
+        },
+        {
+          "key": "network_permissions",
+          "values": [
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=container_binding; state=allowed; evidence={\"container_name\":\"orders\",\"container_port\":8080,\"network_mode\":\"awsvpc\",\"protocol\":\"tcp\",\"task_definition_address\":\"aws_ecs_task_definition.orders\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=listener_ingress; state=allowed; evidence={\"cidr\":\"0.0.0.0/0\",\"internet_source_witness\":\"8.8.8.8\",\"port\":443,\"protocol\":\"tcp\",\"rule_direction\":\"ingress\",\"rule_path\":[\"ingress\",0],\"rule_source_address\":\"aws_security_group.public_alb\",\"security_group_address\":\"aws_security_group.public_alb\",\"selector\":\"cidr\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=load_balancer_egress; state=allowed; evidence={\"peer_security_group_addresses\":[\"aws_security_group.public_tasks\"],\"port\":8080,\"protocol\":\"tcp\",\"rule_direction\":\"egress\",\"rule_path\":[\"egress\",0],\"rule_source_address\":\"aws_security_group.public_alb\",\"security_group_address\":\"aws_security_group.public_alb\",\"selector\":\"security_group\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=service_ingress; state=allowed; evidence={\"peer_security_group_addresses\":[\"aws_security_group.public_alb\"],\"port\":8080,\"protocol\":\"tcp\",\"rule_direction\":\"ingress\",\"rule_path\":[\"ingress\",0],\"rule_source_address\":\"aws_security_group.public_tasks\",\"security_group_address\":\"aws_security_group.public_tasks\",\"selector\":\"security_group\"}"
+          ]
+        },
+        {
+          "key": "task_definitions",
+          "values": [
+            "address=aws_ecs_task_definition.orders"
+          ]
+        },
+        {
+          "key": "task_roles",
+          "values": [
+            "address=aws_iam_role.orders_task; arn=arn:aws:iam::111122223333:role/orders-task; role_kind=ecs_task_role; credential_context=workload_runtime; role_policy_complete=true"
+          ]
+        },
+        {
+          "key": "kms_management_paths",
+          "values": [
+            "key_address=aws_kms_key.data; key_arn=arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; key_id=11111111-1111-1111-1111-111111111111; key_usage=ENCRYPT_DECRYPT; key_origin=EXTERNAL; operation=kms:DeleteImportedKeyMaterial; operation_class=destructive_administration; management_effect=disruption; task_definition=aws_ecs_task_definition.orders; task_role=aws_iam_role.orders_task; authorization_state=allowed; authorization_bases=key_policy_direct,iam_via_key_policy; candidate_authorization_bases=key_policy_direct,iam_via_key_policy; policy_action_patterns=kms:DeleteImportedKeyMaterial; policy_resources=*,arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; deny_action_patterns=none; key_policy_sources=aws_kms_key.data; identity_policy_sources=aws_iam_role.orders_task; grant_sources=none; grant_constraints=none; constraint_state=not_applicable; conditional_policy_evidence_present=false; authorization_requires_condition_evaluation=false; key_origin_compatibility=compatible; operation_evaluation=deterministic_allowed",
+            "key_address=aws_kms_key.data; key_arn=arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; key_id=11111111-1111-1111-1111-111111111111; key_usage=ENCRYPT_DECRYPT; key_origin=EXTERNAL; operation=kms:DisableKey; operation_class=disruptive_administration; management_effect=disruption; task_definition=aws_ecs_task_definition.orders; task_role=aws_iam_role.orders_task; authorization_state=allowed; authorization_bases=key_policy_direct,iam_via_key_policy; candidate_authorization_bases=key_policy_direct,iam_via_key_policy; policy_action_patterns=kms:DisableKey; policy_resources=*,arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; deny_action_patterns=none; key_policy_sources=aws_kms_key.data; identity_policy_sources=aws_iam_role.orders_task; grant_sources=none; grant_constraints=none; constraint_state=not_applicable; conditional_policy_evidence_present=false; authorization_requires_condition_evaluation=false; key_origin_compatibility=not_applicable; operation_evaluation=deterministic_allowed",
+            "key_address=aws_kms_key.data; key_arn=arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; key_id=11111111-1111-1111-1111-111111111111; key_usage=ENCRYPT_DECRYPT; key_origin=EXTERNAL; operation=kms:ScheduleKeyDeletion; operation_class=destructive_administration; management_effect=disruption; task_definition=aws_ecs_task_definition.orders; task_role=aws_iam_role.orders_task; authorization_state=allowed; authorization_bases=key_policy_direct,iam_via_key_policy; candidate_authorization_bases=key_policy_direct,iam_via_key_policy; policy_action_patterns=kms:ScheduleKeyDeletion; policy_resources=*,arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; deny_action_patterns=none; key_policy_sources=aws_kms_key.data; identity_policy_sources=aws_iam_role.orders_task; grant_sources=none; grant_constraints=none; constraint_state=not_applicable; conditional_policy_evidence_present=false; authorization_requires_condition_evaluation=false; key_origin_compatibility=not_applicable; operation_evaluation=deterministic_allowed"
+          ]
+        },
+        {
+          "key": "assessment_scope",
+          "values": [
+            "establishes=deterministic kms:DisableKey and kms:ScheduleKeyDeletion and kms:DeleteImportedKeyMaterial authority for ECS task roles with key disruption effect on exact modeled KMS keys",
+            "does_not_establish=successful operation completion, authority over keys outside the modeled plan, or runtime impact beyond the preserved AWS policy, grant, and key-state evidence"
+          ]
+        },
+        {
+          "key": "downstream_dependencies",
+          "values": [
+            "unique_dependency_count=0; unique_dependent_resource_count=0; blast_radius_basis=no_resolved_downstream_dependents"
+          ]
+        },
+        {
+          "key": "recovery_window",
+          "values": [
+            "key_address=aws_kms_key.data; operation=kms:ScheduleKeyDeletion; deletion_window_in_days=30; recovery_window_state=cancelable_scheduled_deletion",
+            "key_address=aws_kms_key.data; operation=kms:DisableKey; recovery_window_state=not_governed_by_deletion_window",
+            "key_address=aws_kms_key.data; operation=kms:DeleteImportedKeyMaterial; recovery_window_state=not_governed_by_deletion_window"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 2,
+        "data_sensitivity": 1,
+        "lateral_movement": 1,
+        "blast_radius": 1,
+        "final_score": 7,
+        "severity": "high",
+        "computed_severity": null
+      }
+    },
+    {
+      "title": "Internet-facing ECS service can delegate KMS authorization",
+      "category": "Elevation of Privilege",
+      "severity": "high",
+      "affected_resources": [
+        "aws_lb.public",
+        "aws_lb_listener.https",
+        "aws_lb_target_group.orders",
+        "aws_ecs_service.orders",
+        "aws_ecs_task_definition.orders",
+        "aws_iam_role.orders_task",
+        "aws_kms_key.data"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->aws_lb.public",
+      "rationale": "aws_ecs_service.orders is reachable through an internet-facing load balancer and its ECS task role has deterministic KMS authorization-delegation authority (kms:CreateGrant and kms:PutKeyPolicy) on 1 exact modeled KMS key(s) through iam_via_key_policy, key_policy_direct. A compromise of the public workload could change KMS authorization or delegate further key authority through those operations. This establishes cryptographic key-management authority, not proof that the operation will succeed outside the modeled AWS policy, grant, and key-state evidence. The KMS key itself is not public.",
+      "recommended_mitigation": "Reduce public ingress to the ECS service and remove KMS key-policy and grant administration from internet-facing task roles where possible. Restrict any required delegation to exact keys and narrow grant or key-policy operations, and use separate operational identities for authorization changes.",
+      "rule_id": "aws-public-ecs-kms-authorization-delegation",
+      "evidence": [
+        {
+          "key": "network_path",
+          "values": [
+            "internet reaches aws_lb.public through aws_lb_listener.https (HTTPS TCP 443)",
+            "aws_lb_listener.https forwards through aws_lb_target_group.orders to aws_ecs_service.orders container=orders (HTTP TCP 8080)"
+          ]
+        },
+        {
+          "key": "public_ingress",
+          "values": [
+            "listener=aws_lb_listener.https; action_source=aws_lb_listener.https; target_group=aws_lb_target_group.orders; service=aws_ecs_service.orders; container=orders:8080; target_weight=1; conditions=[]; request_witness={\"host_header\":\"a.example\",\"http_request_method\":\"DELETE\",\"path_pattern\":\"/\"}; authentication_actions=[]; evaluation_scope=modeled_listener_container_and_security_group_permissions"
+          ]
+        },
+        {
+          "key": "network_permissions",
+          "values": [
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=container_binding; state=allowed; evidence={\"container_name\":\"orders\",\"container_port\":8080,\"network_mode\":\"awsvpc\",\"protocol\":\"tcp\",\"task_definition_address\":\"aws_ecs_task_definition.orders\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=listener_ingress; state=allowed; evidence={\"cidr\":\"0.0.0.0/0\",\"internet_source_witness\":\"8.8.8.8\",\"port\":443,\"protocol\":\"tcp\",\"rule_direction\":\"ingress\",\"rule_path\":[\"ingress\",0],\"rule_source_address\":\"aws_security_group.public_alb\",\"security_group_address\":\"aws_security_group.public_alb\",\"selector\":\"cidr\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=load_balancer_egress; state=allowed; evidence={\"peer_security_group_addresses\":[\"aws_security_group.public_tasks\"],\"port\":8080,\"protocol\":\"tcp\",\"rule_direction\":\"egress\",\"rule_path\":[\"egress\",0],\"rule_source_address\":\"aws_security_group.public_alb\",\"security_group_address\":\"aws_security_group.public_alb\",\"selector\":\"security_group\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=service_ingress; state=allowed; evidence={\"peer_security_group_addresses\":[\"aws_security_group.public_alb\"],\"port\":8080,\"protocol\":\"tcp\",\"rule_direction\":\"ingress\",\"rule_path\":[\"ingress\",0],\"rule_source_address\":\"aws_security_group.public_tasks\",\"security_group_address\":\"aws_security_group.public_tasks\",\"selector\":\"security_group\"}"
+          ]
+        },
+        {
+          "key": "task_definitions",
+          "values": [
+            "address=aws_ecs_task_definition.orders"
+          ]
+        },
+        {
+          "key": "task_roles",
+          "values": [
+            "address=aws_iam_role.orders_task; arn=arn:aws:iam::111122223333:role/orders-task; role_kind=ecs_task_role; credential_context=workload_runtime; role_policy_complete=true"
+          ]
+        },
+        {
+          "key": "kms_management_paths",
+          "values": [
+            "key_address=aws_kms_key.data; key_arn=arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; key_id=11111111-1111-1111-1111-111111111111; key_usage=ENCRYPT_DECRYPT; key_origin=EXTERNAL; operation=kms:CreateGrant; operation_class=authorization_administration; management_effect=delegation; task_definition=aws_ecs_task_definition.orders; task_role=aws_iam_role.orders_task; authorization_state=allowed; authorization_bases=key_policy_direct,iam_via_key_policy; candidate_authorization_bases=key_policy_direct,iam_via_key_policy; policy_action_patterns=kms:CreateGrant; policy_resources=*,arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; deny_action_patterns=none; key_policy_sources=aws_kms_key.data; identity_policy_sources=aws_iam_role.orders_task; grant_sources=none; grant_constraints=none; constraint_state=not_applicable; conditional_policy_evidence_present=false; authorization_requires_condition_evaluation=false; key_origin_compatibility=not_applicable; operation_evaluation=deterministic_allowed",
+            "key_address=aws_kms_key.data; key_arn=arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; key_id=11111111-1111-1111-1111-111111111111; key_usage=ENCRYPT_DECRYPT; key_origin=EXTERNAL; operation=kms:PutKeyPolicy; operation_class=authorization_administration; management_effect=delegation; task_definition=aws_ecs_task_definition.orders; task_role=aws_iam_role.orders_task; authorization_state=allowed; authorization_bases=key_policy_direct,iam_via_key_policy; candidate_authorization_bases=key_policy_direct,iam_via_key_policy; policy_action_patterns=kms:PutKeyPolicy; policy_resources=*,arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; deny_action_patterns=none; key_policy_sources=aws_kms_key.data; identity_policy_sources=aws_iam_role.orders_task; grant_sources=none; grant_constraints=none; constraint_state=not_applicable; conditional_policy_evidence_present=false; authorization_requires_condition_evaluation=false; key_origin_compatibility=not_applicable; operation_evaluation=deterministic_allowed"
+          ]
+        },
+        {
+          "key": "assessment_scope",
+          "values": [
+            "establishes=deterministic kms:CreateGrant and kms:PutKeyPolicy authority for ECS task roles with authorization delegation effect on exact modeled KMS keys",
+            "does_not_establish=successful operation completion, authority over keys outside the modeled plan, or runtime impact beyond the preserved AWS policy, grant, and key-state evidence"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 2,
+        "data_sensitivity": 1,
+        "lateral_movement": 1,
+        "blast_radius": 1,
+        "final_score": 7,
+        "severity": "high",
+        "computed_severity": null
+      }
+    }
+  ],
+  "protected_data": [
+    {
+      "title": "Internet-facing ECS service can use KMS to decrypt",
+      "category": "Information Disclosure",
+      "severity": "high",
+      "affected_resources": [
+        "aws_lb.public",
+        "aws_lb_listener.https",
+        "aws_lb_target_group.orders",
+        "aws_ecs_service.orders",
+        "aws_ecs_task_definition.orders",
+        "aws_iam_role.orders_task",
+        "aws_kms_key.data",
+        "aws_s3_bucket.orders"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->aws_lb.public",
+      "rationale": "aws_ecs_service.orders is reachable through an internet-facing load balancer and its ECS task role has deterministic kms:Decrypt authority on 1 exact modeled KMS key(s) through key_policy_direct. A compromise of the public workload could attempt KMS decrypt operations, creating information-disclosure potential. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext or can disclose plaintext. The exact decrypt evidence converges with 1 unique KMS-protected S3 resource(s) across 1 unique encryption dependency relationship(s). The KMS key itself is not public.",
+      "recommended_mitigation": "Reduce public ingress to the ECS service and restrict the task role to only the exact KMS decrypt operations and key ARNs required at runtime. Keep key-policy delegation, IAM permissions, and KMS grants narrowly scoped, and separate cryptographic identities from internet-facing application roles.",
+      "rule_id": "aws-public-ecs-kms-decrypt-access",
+      "evidence": [
+        {
+          "key": "network_path",
+          "values": [
+            "internet reaches aws_lb.public through aws_lb_listener.https (HTTPS TCP 443)",
+            "aws_lb_listener.https forwards through aws_lb_target_group.orders to aws_ecs_service.orders container=orders (HTTP TCP 8080)"
+          ]
+        },
+        {
+          "key": "public_ingress",
+          "values": [
+            "listener=aws_lb_listener.https; action_source=aws_lb_listener.https; target_group=aws_lb_target_group.orders; service=aws_ecs_service.orders; container=orders:8080; target_weight=1; conditions=[]; request_witness={\"host_header\":\"a.example\",\"http_request_method\":\"DELETE\",\"path_pattern\":\"/\"}; authentication_actions=[]; evaluation_scope=modeled_listener_container_and_security_group_permissions"
+          ]
+        },
+        {
+          "key": "network_permissions",
+          "values": [
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=container_binding; state=allowed; evidence={\"container_name\":\"orders\",\"container_port\":8080,\"network_mode\":\"awsvpc\",\"protocol\":\"tcp\",\"task_definition_address\":\"aws_ecs_task_definition.orders\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=listener_ingress; state=allowed; evidence={\"cidr\":\"0.0.0.0/0\",\"internet_source_witness\":\"8.8.8.8\",\"port\":443,\"protocol\":\"tcp\",\"rule_direction\":\"ingress\",\"rule_path\":[\"ingress\",0],\"rule_source_address\":\"aws_security_group.public_alb\",\"security_group_address\":\"aws_security_group.public_alb\",\"selector\":\"cidr\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=load_balancer_egress; state=allowed; evidence={\"peer_security_group_addresses\":[\"aws_security_group.public_tasks\"],\"port\":8080,\"protocol\":\"tcp\",\"rule_direction\":\"egress\",\"rule_path\":[\"egress\",0],\"rule_source_address\":\"aws_security_group.public_alb\",\"security_group_address\":\"aws_security_group.public_alb\",\"selector\":\"security_group\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=service_ingress; state=allowed; evidence={\"peer_security_group_addresses\":[\"aws_security_group.public_alb\"],\"port\":8080,\"protocol\":\"tcp\",\"rule_direction\":\"ingress\",\"rule_path\":[\"ingress\",0],\"rule_source_address\":\"aws_security_group.public_tasks\",\"security_group_address\":\"aws_security_group.public_tasks\",\"selector\":\"security_group\"}"
+          ]
+        },
+        {
+          "key": "task_definitions",
+          "values": [
+            "address=aws_ecs_task_definition.orders"
+          ]
+        },
+        {
+          "key": "task_roles",
+          "values": [
+            "address=aws_iam_role.orders_task; arn=arn:aws:iam::111122223333:role/orders-task; role_kind=ecs_task_role; credential_context=workload_runtime; role_policy_complete=true"
+          ]
+        },
+        {
+          "key": "kms_operation_paths",
+          "values": [
+            "key_address=aws_kms_key.data; key_arn=arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; key_id=11111111-1111-1111-1111-111111111111; key_usage=ENCRYPT_DECRYPT; key_spec=SYMMETRIC_DEFAULT; operation=kms:Decrypt; task_definition=aws_ecs_task_definition.orders; task_role=aws_iam_role.orders_task; authorization_state=allowed; authorization_bases=key_policy_direct; candidate_authorization_bases=key_policy_direct,iam_via_key_policy; policy_action_patterns=kms:Decrypt; policy_resources=*,arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; deny_action_patterns=none; key_policy_sources=aws_kms_key.data; identity_policy_sources=aws_iam_role.orders_task; grant_sources=none; grant_constraints=none; constraint_state=not_applicable; operation_evaluation=deterministic_allowed"
+          ]
+        },
+        {
+          "key": "assessment_scope",
+          "values": [
+            "establishes=deterministic kms:Decrypt authority for an ECS task role on exact modeled KMS keys",
+            "does_not_establish=useful ciphertext, plaintext disclosure, accepted application signatures or MACs, or runtime success outside the modeled AWS policy and grant evidence"
+          ]
+        },
+        {
+          "key": "downstream_dependencies",
+          "values": [
+            "unique_dependency_count=1; unique_dependent_resource_count=1; downstream_dependency_state=resolved_dependents",
+            "key_address=aws_kms_key.data; dependent_address=aws_s3_bucket.orders; dependency_source=aws_s3_bucket_server_side_encryption_configuration.orders; configuration_path=['rule', 0, 'apply_server_side_encryption_by_default', 0, 'kms_master_key_id']; reference_kind=alias_arn"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 1,
+        "data_sensitivity": 2,
+        "lateral_movement": 1,
+        "blast_radius": 1,
+        "final_score": 7,
+        "severity": "high",
+        "computed_severity": null
+      }
+    }
+  ],
+  "downstream_disruption": [
+    {
+      "title": "Internet-facing ECS service can disrupt KMS keys",
+      "category": "Denial of Service",
+      "severity": "high",
+      "affected_resources": [
+        "aws_lb.public",
+        "aws_lb_listener.https",
+        "aws_lb_target_group.orders",
+        "aws_ecs_service.orders",
+        "aws_ecs_task_definition.orders",
+        "aws_iam_role.orders_task",
+        "aws_kms_key.data",
+        "aws_sqs_queue.orders"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->aws_lb.public",
+      "rationale": "aws_ecs_service.orders is reachable through an internet-facing load balancer and its ECS task role has deterministic KMS key-disruption authority (kms:DisableKey and kms:ScheduleKeyDeletion) on 1 exact modeled KMS key(s) through iam_via_key_policy, key_policy_direct. A compromise of the public workload could disrupt KMS-backed data or cryptographic availability through those operations. The modeled keys have 1 unique downstream encrypted dependent resource(s) across 1 unique dependency relationship(s). Recovery-window evidence: key_address=aws_kms_key.data; operation=kms:ScheduleKeyDeletion; deletion_window_in_days=30; recovery_window_state=cancelable_scheduled_deletion, key_address=aws_kms_key.data; operation=kms:DisableKey; recovery_window_state=not_governed_by_deletion_window. This establishes cryptographic key-management authority, not proof that the operation will succeed outside the modeled AWS policy, grant, and key-state evidence. The KMS key itself is not public.",
+      "recommended_mitigation": "Reduce public ingress to the ECS service and restrict the task role to only the exact KMS key disruption operations and key ARNs required at runtime. Keep disable, deletion, and imported-key material controls with separate operational identities, and preserve recovery windows for dependent encrypted data.",
+      "rule_id": "aws-public-ecs-kms-key-disruption",
+      "evidence": [
+        {
+          "key": "network_path",
+          "values": [
+            "internet reaches aws_lb.public through aws_lb_listener.https (HTTPS TCP 443)",
+            "aws_lb_listener.https forwards through aws_lb_target_group.orders to aws_ecs_service.orders container=orders (HTTP TCP 8080)"
+          ]
+        },
+        {
+          "key": "public_ingress",
+          "values": [
+            "listener=aws_lb_listener.https; action_source=aws_lb_listener.https; target_group=aws_lb_target_group.orders; service=aws_ecs_service.orders; container=orders:8080; target_weight=1; conditions=[]; request_witness={\"host_header\":\"a.example\",\"http_request_method\":\"DELETE\",\"path_pattern\":\"/\"}; authentication_actions=[]; evaluation_scope=modeled_listener_container_and_security_group_permissions"
+          ]
+        },
+        {
+          "key": "network_permissions",
+          "values": [
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=container_binding; state=allowed; evidence={\"container_name\":\"orders\",\"container_port\":8080,\"network_mode\":\"awsvpc\",\"protocol\":\"tcp\",\"task_definition_address\":\"aws_ecs_task_definition.orders\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=listener_ingress; state=allowed; evidence={\"cidr\":\"0.0.0.0/0\",\"internet_source_witness\":\"8.8.8.8\",\"port\":443,\"protocol\":\"tcp\",\"rule_direction\":\"ingress\",\"rule_path\":[\"ingress\",0],\"rule_source_address\":\"aws_security_group.public_alb\",\"security_group_address\":\"aws_security_group.public_alb\",\"selector\":\"cidr\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=load_balancer_egress; state=allowed; evidence={\"peer_security_group_addresses\":[\"aws_security_group.public_tasks\"],\"port\":8080,\"protocol\":\"tcp\",\"rule_direction\":\"egress\",\"rule_path\":[\"egress\",0],\"rule_source_address\":\"aws_security_group.public_alb\",\"security_group_address\":\"aws_security_group.public_alb\",\"selector\":\"security_group\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=service_ingress; state=allowed; evidence={\"peer_security_group_addresses\":[\"aws_security_group.public_alb\"],\"port\":8080,\"protocol\":\"tcp\",\"rule_direction\":\"ingress\",\"rule_path\":[\"ingress\",0],\"rule_source_address\":\"aws_security_group.public_tasks\",\"security_group_address\":\"aws_security_group.public_tasks\",\"selector\":\"security_group\"}"
+          ]
+        },
+        {
+          "key": "task_definitions",
+          "values": [
+            "address=aws_ecs_task_definition.orders"
+          ]
+        },
+        {
+          "key": "task_roles",
+          "values": [
+            "address=aws_iam_role.orders_task; arn=arn:aws:iam::111122223333:role/orders-task; role_kind=ecs_task_role; credential_context=workload_runtime; role_policy_complete=true"
+          ]
+        },
+        {
+          "key": "kms_management_paths",
+          "values": [
+            "key_address=aws_kms_key.data; key_arn=arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; key_id=11111111-1111-1111-1111-111111111111; key_usage=ENCRYPT_DECRYPT; key_origin=AWS_KMS; operation=kms:DisableKey; operation_class=disruptive_administration; management_effect=disruption; task_definition=aws_ecs_task_definition.orders; task_role=aws_iam_role.orders_task; authorization_state=allowed; authorization_bases=key_policy_direct,iam_via_key_policy; candidate_authorization_bases=key_policy_direct,iam_via_key_policy; policy_action_patterns=kms:DisableKey; policy_resources=*,arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; deny_action_patterns=none; key_policy_sources=aws_kms_key.data; identity_policy_sources=aws_iam_role.orders_task; grant_sources=none; grant_constraints=none; constraint_state=not_applicable; conditional_policy_evidence_present=false; authorization_requires_condition_evaluation=false; key_origin_compatibility=not_applicable; operation_evaluation=deterministic_allowed",
+            "key_address=aws_kms_key.data; key_arn=arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; key_id=11111111-1111-1111-1111-111111111111; key_usage=ENCRYPT_DECRYPT; key_origin=AWS_KMS; operation=kms:ScheduleKeyDeletion; operation_class=destructive_administration; management_effect=disruption; task_definition=aws_ecs_task_definition.orders; task_role=aws_iam_role.orders_task; authorization_state=allowed; authorization_bases=key_policy_direct,iam_via_key_policy; candidate_authorization_bases=key_policy_direct,iam_via_key_policy; policy_action_patterns=kms:ScheduleKeyDeletion; policy_resources=*,arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; deny_action_patterns=none; key_policy_sources=aws_kms_key.data; identity_policy_sources=aws_iam_role.orders_task; grant_sources=none; grant_constraints=none; constraint_state=not_applicable; conditional_policy_evidence_present=false; authorization_requires_condition_evaluation=false; key_origin_compatibility=not_applicable; operation_evaluation=deterministic_allowed"
+          ]
+        },
+        {
+          "key": "assessment_scope",
+          "values": [
+            "establishes=deterministic kms:DisableKey and kms:ScheduleKeyDeletion authority for ECS task roles with key disruption effect on exact modeled KMS keys",
+            "does_not_establish=successful operation completion, authority over keys outside the modeled plan, or runtime impact beyond the preserved AWS policy, grant, and key-state evidence"
+          ]
+        },
+        {
+          "key": "downstream_dependencies",
+          "values": [
+            "unique_dependency_count=1; unique_dependent_resource_count=1; blast_radius_basis=downstream_encrypted_dependents",
+            "key_address=aws_kms_key.data; dependent_address=aws_sqs_queue.orders; dependency_source=aws_sqs_queue.orders; configuration_path=['kms_master_key_id']; reference_kind=key_arn"
+          ]
+        },
+        {
+          "key": "recovery_window",
+          "values": [
+            "key_address=aws_kms_key.data; operation=kms:ScheduleKeyDeletion; deletion_window_in_days=30; recovery_window_state=cancelable_scheduled_deletion",
+            "key_address=aws_kms_key.data; operation=kms:DisableKey; recovery_window_state=not_governed_by_deletion_window"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 2,
+        "data_sensitivity": 1,
+        "lateral_movement": 1,
+        "blast_radius": 1,
+        "final_score": 7,
+        "severity": "high",
+        "computed_severity": null
+      }
+    },
+    {
+      "title": "Internet-facing ECS service can delegate KMS authorization",
+      "category": "Elevation of Privilege",
+      "severity": "high",
+      "affected_resources": [
+        "aws_lb.public",
+        "aws_lb_listener.https",
+        "aws_lb_target_group.orders",
+        "aws_ecs_service.orders",
+        "aws_ecs_task_definition.orders",
+        "aws_iam_role.orders_task",
+        "aws_kms_key.data"
+      ],
+      "trust_boundary_id": "internet-to-service:internet->aws_lb.public",
+      "rationale": "aws_ecs_service.orders is reachable through an internet-facing load balancer and its ECS task role has deterministic KMS authorization-delegation authority (kms:CreateGrant and kms:PutKeyPolicy) on 1 exact modeled KMS key(s) through iam_via_key_policy, key_policy_direct. A compromise of the public workload could change KMS authorization or delegate further key authority through those operations. This establishes cryptographic key-management authority, not proof that the operation will succeed outside the modeled AWS policy, grant, and key-state evidence. The KMS key itself is not public.",
+      "recommended_mitigation": "Reduce public ingress to the ECS service and remove KMS key-policy and grant administration from internet-facing task roles where possible. Restrict any required delegation to exact keys and narrow grant or key-policy operations, and use separate operational identities for authorization changes.",
+      "rule_id": "aws-public-ecs-kms-authorization-delegation",
+      "evidence": [
+        {
+          "key": "network_path",
+          "values": [
+            "internet reaches aws_lb.public through aws_lb_listener.https (HTTPS TCP 443)",
+            "aws_lb_listener.https forwards through aws_lb_target_group.orders to aws_ecs_service.orders container=orders (HTTP TCP 8080)"
+          ]
+        },
+        {
+          "key": "public_ingress",
+          "values": [
+            "listener=aws_lb_listener.https; action_source=aws_lb_listener.https; target_group=aws_lb_target_group.orders; service=aws_ecs_service.orders; container=orders:8080; target_weight=1; conditions=[]; request_witness={\"host_header\":\"a.example\",\"http_request_method\":\"DELETE\",\"path_pattern\":\"/\"}; authentication_actions=[]; evaluation_scope=modeled_listener_container_and_security_group_permissions"
+          ]
+        },
+        {
+          "key": "network_permissions",
+          "values": [
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=container_binding; state=allowed; evidence={\"container_name\":\"orders\",\"container_port\":8080,\"network_mode\":\"awsvpc\",\"protocol\":\"tcp\",\"task_definition_address\":\"aws_ecs_task_definition.orders\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=listener_ingress; state=allowed; evidence={\"cidr\":\"0.0.0.0/0\",\"internet_source_witness\":\"8.8.8.8\",\"port\":443,\"protocol\":\"tcp\",\"rule_direction\":\"ingress\",\"rule_path\":[\"ingress\",0],\"rule_source_address\":\"aws_security_group.public_alb\",\"security_group_address\":\"aws_security_group.public_alb\",\"selector\":\"cidr\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=load_balancer_egress; state=allowed; evidence={\"peer_security_group_addresses\":[\"aws_security_group.public_tasks\"],\"port\":8080,\"protocol\":\"tcp\",\"rule_direction\":\"egress\",\"rule_path\":[\"egress\",0],\"rule_source_address\":\"aws_security_group.public_alb\",\"security_group_address\":\"aws_security_group.public_alb\",\"selector\":\"security_group\"}",
+            "listener=aws_lb_listener.https; target_group=aws_lb_target_group.orders; check=service_ingress; state=allowed; evidence={\"peer_security_group_addresses\":[\"aws_security_group.public_alb\"],\"port\":8080,\"protocol\":\"tcp\",\"rule_direction\":\"ingress\",\"rule_path\":[\"ingress\",0],\"rule_source_address\":\"aws_security_group.public_tasks\",\"security_group_address\":\"aws_security_group.public_tasks\",\"selector\":\"security_group\"}"
+          ]
+        },
+        {
+          "key": "task_definitions",
+          "values": [
+            "address=aws_ecs_task_definition.orders"
+          ]
+        },
+        {
+          "key": "task_roles",
+          "values": [
+            "address=aws_iam_role.orders_task; arn=arn:aws:iam::111122223333:role/orders-task; role_kind=ecs_task_role; credential_context=workload_runtime; role_policy_complete=true"
+          ]
+        },
+        {
+          "key": "kms_management_paths",
+          "values": [
+            "key_address=aws_kms_key.data; key_arn=arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; key_id=11111111-1111-1111-1111-111111111111; key_usage=ENCRYPT_DECRYPT; key_origin=AWS_KMS; operation=kms:CreateGrant; operation_class=authorization_administration; management_effect=delegation; task_definition=aws_ecs_task_definition.orders; task_role=aws_iam_role.orders_task; authorization_state=allowed; authorization_bases=key_policy_direct,iam_via_key_policy; candidate_authorization_bases=key_policy_direct,iam_via_key_policy; policy_action_patterns=kms:CreateGrant; policy_resources=*,arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; deny_action_patterns=none; key_policy_sources=aws_kms_key.data; identity_policy_sources=aws_iam_role.orders_task; grant_sources=none; grant_constraints=none; constraint_state=not_applicable; conditional_policy_evidence_present=false; authorization_requires_condition_evaluation=false; key_origin_compatibility=not_applicable; operation_evaluation=deterministic_allowed",
+            "key_address=aws_kms_key.data; key_arn=arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; key_id=11111111-1111-1111-1111-111111111111; key_usage=ENCRYPT_DECRYPT; key_origin=AWS_KMS; operation=kms:PutKeyPolicy; operation_class=authorization_administration; management_effect=delegation; task_definition=aws_ecs_task_definition.orders; task_role=aws_iam_role.orders_task; authorization_state=allowed; authorization_bases=key_policy_direct,iam_via_key_policy; candidate_authorization_bases=key_policy_direct,iam_via_key_policy; policy_action_patterns=kms:PutKeyPolicy; policy_resources=*,arn:aws:kms:us-east-1:111122223333:key/11111111-1111-1111-1111-111111111111; deny_action_patterns=none; key_policy_sources=aws_kms_key.data; identity_policy_sources=aws_iam_role.orders_task; grant_sources=none; grant_constraints=none; constraint_state=not_applicable; conditional_policy_evidence_present=false; authorization_requires_condition_evaluation=false; key_origin_compatibility=not_applicable; operation_evaluation=deterministic_allowed"
+          ]
+        },
+        {
+          "key": "assessment_scope",
+          "values": [
+            "establishes=deterministic kms:CreateGrant and kms:PutKeyPolicy authority for ECS task roles with authorization delegation effect on exact modeled KMS keys",
+            "does_not_establish=successful operation completion, authority over keys outside the modeled plan, or runtime impact beyond the preserved AWS policy, grant, and key-state evidence"
+          ]
+        }
+      ],
+      "severity_reasoning": {
+        "internet_exposure": 2,
+        "privilege_breadth": 2,
+        "data_sensitivity": 1,
+        "lateral_movement": 1,
+        "blast_radius": 1,
+        "final_score": 7,
+        "severity": "high",
+        "computed_severity": null
+      }
+    }
+  ]
+}
