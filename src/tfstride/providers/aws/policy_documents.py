@@ -2,10 +2,17 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from fnmatch import fnmatchcase
 from typing import Any, Literal
 
 from tfstride.models import IAMPolicyCondition, IAMPolicyStatement, IAMPrincipal
 from tfstride.providers.aws.coercion import as_list, compact
+
+_ASSUME_ROLE_ACTIONS = (
+    "sts:assumerole",
+    "sts:assumerolewithsaml",
+    "sts:assumerolewithwebidentity",
+)
 
 SUPPORTED_TRUST_NARROWING_CONDITIONS = {
     "sts:ExternalId": {
@@ -171,7 +178,9 @@ def extract_trust_statements(policy_document: dict[str, Any]) -> list[dict[str, 
     trust_statements: list[dict[str, Any]] = []
     for raw_statement in as_list(policy_document.get("Statement")):
         statement = parse_policy_statement(raw_statement)
-        if statement.effect != "Allow":
+        if statement.effect != "Allow" or not any(
+            fnmatchcase(operation, action.lower()) for action in statement.actions for operation in _ASSUME_ROLE_ACTIONS
+        ):
             continue
         principals = sorted(set(statement.principals))
         if not principals:
