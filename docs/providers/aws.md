@@ -90,6 +90,11 @@ S3 object-deletion and bucket-deletion authorization compare the established own
 
 ## Rule Coverage
 
+Role-trust boundaries, findings, and narrowed-trust observations require an Allow statement whose actions match
+`sts:AssumeRole`, `sts:AssumeRoleWithSAML`, or `sts:AssumeRoleWithWebIdentity`, including case-insensitive IAM action
+wildcards. Supplemental permissions such as `sts:TagSession` and `sts:SetSourceIdentity` do not independently authorize
+role assumption, bypass conditions on an assume-role statement, or establish narrowing for that statement.
+
 ### Public exposure & edge
 * Public compute ingress and public Lambda Function URL invocation
 * CloudFront viewer HTTP/TLS/WAF and standard access-log posture
