@@ -7,8 +7,7 @@ policies, custom roles, and system- and user-assigned identities), so a change t
 those paths are validated must preserve valid findings, evidence, and ordering.
 Second, what happens when authorization resources change while the previously
 decorated paths are retained: a fresh normalization drops the finding, and
-reevaluation should too. Cases where reevaluation still reports the old finding are
-marked as expected failures until the operation rules revalidate current authorization.
+reevaluation must too, because the operation rules revalidate current authorization.
 
 Regenerate the recorded findings only for a deliberate behavior change:
 
@@ -206,10 +205,6 @@ class AzureKeyVaultOperationFindingsSnapshotTests(unittest.TestCase):
 
 
 class AzureKeyVaultOperationReevaluationTests(unittest.TestCase):
-    # The operation rules currently trust the authorization evidence stored on each path, so
-    # every changed-authorization case below still reports the old findings on reevaluation.
-    # The rejection tests are expected failures until the rules revalidate current authorization.
-
     def assert_reevaluation_matches_fresh_normalization(
         self,
         base: list[TerraformResource],
@@ -230,7 +225,6 @@ class AzureKeyVaultOperationReevaluationTests(unittest.TestCase):
                     [_finding_record(finding) for finding in _evaluate(original)],
                 )
 
-    @unittest.expectedFailure
     def test_changed_role_assignment_principal_is_rejected(self) -> None:
         self.assert_reevaluation_matches_fresh_normalization(
             _base(True, _role_assignment()),
@@ -238,7 +232,6 @@ class AzureKeyVaultOperationReevaluationTests(unittest.TestCase):
             "azurerm_role_assignment.key_access",
         )
 
-    @unittest.expectedFailure
     def test_added_role_assignment_condition_is_rejected(self) -> None:
         self.assert_reevaluation_matches_fresh_normalization(
             _base(True, _role_assignment()),
@@ -246,7 +239,6 @@ class AzureKeyVaultOperationReevaluationTests(unittest.TestCase):
             "azurerm_role_assignment.key_access",
         )
 
-    @unittest.expectedFailure
     def test_removed_access_policy_permissions_are_rejected(self) -> None:
         self.assert_reevaluation_matches_fresh_normalization(
             _base(False, _access_policy(principal_id=_SYSTEM_PRINCIPAL_ID)),
@@ -254,7 +246,6 @@ class AzureKeyVaultOperationReevaluationTests(unittest.TestCase):
             "azurerm_key_vault_access_policy.runtime",
         )
 
-    @unittest.expectedFailure
     def test_changed_custom_role_permissions_are_rejected(self) -> None:
         self.assert_reevaluation_matches_fresh_normalization(
             _base(True, _custom_role(_CUSTOM_KEY_ACTIONS), _custom_role_assignment()),
@@ -266,7 +257,6 @@ class AzureKeyVaultOperationReevaluationTests(unittest.TestCase):
             "azurerm_role_definition.key_operator",
         )
 
-    @unittest.expectedFailure
     def test_changed_assignment_scope_is_rejected(self) -> None:
         self.assert_reevaluation_matches_fresh_normalization(
             _base(True, _role_assignment()),
@@ -274,7 +264,6 @@ class AzureKeyVaultOperationReevaluationTests(unittest.TestCase):
             "azurerm_role_assignment.key_access",
         )
 
-    @unittest.expectedFailure
     def test_changed_role_definition_to_a_non_crypto_role_is_rejected(self) -> None:
         self.assert_reevaluation_matches_fresh_normalization(
             _base(True, _role_assignment()),
@@ -285,7 +274,6 @@ class AzureKeyVaultOperationReevaluationTests(unittest.TestCase):
             "azurerm_role_assignment.key_access",
         )
 
-    @unittest.expectedFailure
     def test_switching_the_vault_authorization_model_is_rejected(self) -> None:
         self.assert_reevaluation_matches_fresh_normalization(
             _base(True, _role_assignment()),

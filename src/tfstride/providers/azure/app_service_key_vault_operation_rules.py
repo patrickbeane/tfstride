@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal, cast
 
@@ -31,8 +31,14 @@ from tfstride.providers.azure.protected_data_evidence import (
     AzureAppServiceStorageAccessPath,
     AzureAppServiceStorageProtectedDataConvergence,
 )
+from tfstride.providers.azure.resource_decoration.app_service_key_vault_operation_paths import (
+    current_app_service_key_vault_operation_paths,
+)
 from tfstride.providers.azure.resource_decoration.app_service_key_vault_protected_data_convergence import (
     current_storage_protected_data_convergences,
+)
+from tfstride.providers.azure.resource_decoration.key_vault_key_authorization import (
+    current_key_vault_keys_with_authorization,
 )
 from tfstride.providers.azure.resource_facts import AzureResourceFacts, azure_facts
 from tfstride.providers.azure.resource_index import AzureDecorationContext, AzureResourceIndexBuilder
@@ -119,8 +125,14 @@ class AzureAppServiceKeyVaultOperationRuleDetectors:
         if context.inventory.provider != "azure":
             return []
 
-        decoration_context = AzureDecorationContext(
-            AzureResourceIndexBuilder().build(list(context.inventory.resources))
+        current_resources = list(context.inventory.resources)
+        decoration_context = AzureDecorationContext(AzureResourceIndexBuilder().build(current_resources))
+        # Authorization is recomputed from the inventory as it is now, once per invocation, so a
+        # path whose grant no longer holds is rejected instead of trusted from earlier decoration.
+        current_keys = current_key_vault_keys_with_authorization(
+            tuple(context.inventory.by_type(AzureResourceType.KEY_VAULT_KEY)),
+            current_resources,
+            decoration_context,
         )
         findings: list[Finding] = []
         for app in context.inventory.by_type(*AZURE_APP_SERVICE_RESOURCE_TYPES):
@@ -134,6 +146,12 @@ class AzureAppServiceKeyVaultOperationRuleDetectors:
                 for path in facts.app_service_key_vault_operation_paths
                 if _is_deterministic_operation_path(path, app, context, operation_class)
             ]
+            if not paths:
+                continue
+            paths = _current_paths(
+                paths,
+                current_app_service_key_vault_operation_paths(app, current_keys, decoration_context),
+            )
             if not paths:
                 continue
 
@@ -219,6 +237,56 @@ class AzureAppServiceKeyVaultOperationRuleDetectors:
                 )
             )
         return findings
+
+
+_RELATIONSHIP_FIELDS = (
+    "workload_address",
+    "workload_type",
+    "identity_address",
+    "identity_kind",
+    "principal_id",
+    "key_address",
+    "key_vault_address",
+    "key_vault_id",
+    "operation",
+    "operation_class",
+    "matched_key_operation",
+    "grant_kind",
+    "grant_source_address",
+    "grant_source_type",
+    "authorization_model",
+    "scope_type",
+    "scope_arm_id",
+    "role_definition_address",
+    "role_definition_id",
+)
+
+
+def _relationship_key(path: Mapping[str, object]) -> tuple[object, ...]:
+    return tuple(_casefold(path.get(field)) for field in _RELATIONSHIP_FIELDS)
+
+
+def _casefold(value: object) -> object:
+    return value.casefold() if isinstance(value, str) else value
+
+
+def _current_paths(
+    stored_paths: Sequence[AzureAppServiceKeyVaultOperationPath],
+    recomputed_paths: Sequence[AzureAppServiceKeyVaultOperationPath],
+) -> list[AzureAppServiceKeyVaultOperationPath]:
+    """Keep the stored paths whose authorization still holds, using the recomputed evidence."""
+
+    recomputed_by_relationship = {_relationship_key(path): path for path in recomputed_paths}
+    current: list[AzureAppServiceKeyVaultOperationPath] = []
+    seen: set[tuple[object, ...]] = set()
+    for stored in stored_paths:
+        relationship = _relationship_key(stored)
+        recomputed = recomputed_by_relationship.get(relationship)
+        if recomputed is None or relationship in seen:
+            continue
+        seen.add(relationship)
+        current.append(recomputed)
+    return current
 
 
 def _is_deterministic_operation_path(

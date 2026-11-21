@@ -66,6 +66,22 @@ class ModelAppServiceKeyVaultOperationPathsStage:
             facts.extend_app_service_key_vault_operation_path_uncertainties(uncertainties)
 
 
+def current_app_service_key_vault_operation_paths(
+    workload: NormalizedResource,
+    current_keys: Sequence[NormalizedResource],
+    context: AzureDecorationContext,
+) -> list[AzureAppServiceKeyVaultOperationPath]:
+    """Recompute a workload's operation paths from keys carrying current authorization.
+
+    `current_keys` come from `current_key_vault_keys_with_authorization`, so the grants
+    reflect the present role assignments, role definitions, and access-policy resources
+    rather than the evidence stored when the inventory was first decorated.
+    """
+
+    paths, _uncertainties = _app_service_key_vault_operation_paths(workload, current_keys, context)
+    return paths
+
+
 def _app_service_key_vault_operation_paths(
     workload: NormalizedResource,
     keys: Sequence[NormalizedResource],

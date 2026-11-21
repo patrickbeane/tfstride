@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from collections.abc import Sequence
+from dataclasses import dataclass, replace
 from fnmatch import fnmatchcase
 from typing import Literal
 
@@ -12,6 +13,7 @@ from tfstride.providers.azure.key_vault_evidence import (
     AzureKeyVaultAuthorizationModel,
     AzureKeyVaultGrantScopeType,
 )
+from tfstride.providers.azure.metadata import AzureResourceMetadata
 from tfstride.providers.azure.resource_facts import azure_facts
 from tfstride.providers.azure.resource_index import AzureDecorationContext
 from tfstride.providers.azure.resource_types import AzureResourceType
@@ -329,6 +331,15 @@ def _key_authorization_posture(
     )
     if vault is None or vault.resource_type != AzureResourceType.KEY_VAULT:
         return [], [f"{key.address}: exact parent Key Vault is unresolved"]
+    return _key_authorization_posture_for_vault(key, vault, assignments, context)
+
+
+def _key_authorization_posture_for_vault(
+    key: NormalizedResource,
+    vault: NormalizedResource,
+    assignments: tuple[NormalizedResource, ...],
+    context: AzureDecorationContext,
+) -> tuple[list[AzureKeyVaultAuthorizationGrant], list[str]]:
     vault_facts = azure_facts(vault)
 
     authorization_model = _authorization_model(vault_facts.rbac_authorization_enabled)
@@ -366,6 +377,107 @@ def _key_authorization_posture(
         )
     )
     return grants, dedupe(uncertainties)
+
+
+def current_key_vault_keys_with_authorization(
+    keys: Sequence[NormalizedResource],
+    resources: Sequence[NormalizedResource],
+    context: AzureDecorationContext,
+) -> tuple[NormalizedResource, ...]:
+    """Return copies of `keys` whose authorization is recomputed from the current inventory.
+
+    Decoration merges standalone access policies onto the vault's metadata, so a vault
+    that was decorated earlier can carry policies that no longer exist. The recomputation
+    rebuilds each vault's policies from the current policy resources and reads role
+    assignments and role definitions from the current inventory instead of trusting the
+    grants stored on the keys.
+    """
+
+    assignments = tuple(
+        resource for resource in resources if resource.resource_type == AzureResourceType.ROLE_ASSIGNMENT
+    )
+    current_vaults: dict[str, NormalizedResource] = {}
+    current_keys: list[NormalizedResource] = []
+    for key in keys:
+        current_key = replace(key, metadata=key.metadata_snapshot())
+        grants, uncertainties = _current_key_authorization(key, resources, assignments, context, current_vaults)
+        azure_facts(current_key).set_key_vault_key_authorization_posture(grants=grants, uncertainties=uncertainties)
+        current_keys.append(current_key)
+    return tuple(current_keys)
+
+
+def _current_key_authorization(
+    key: NormalizedResource,
+    resources: Sequence[NormalizedResource],
+    assignments: tuple[NormalizedResource, ...],
+    context: AzureDecorationContext,
+    current_vaults: dict[str, NormalizedResource],
+) -> tuple[list[AzureKeyVaultAuthorizationGrant], list[str]]:
+    key_facts = azure_facts(key)
+    if key_facts.key_vault_key_identity_state != "resolved":
+        return [], [f"{key.address}: exact Key Vault key identity is unresolved"]
+    vault = context.index.resolve(
+        key_facts.resolved_key_vault_address,
+        source=key,
+        resource_types={AzureResourceType.KEY_VAULT},
+    )
+    if vault is None or vault.resource_type != AzureResourceType.KEY_VAULT:
+        return [], [f"{key.address}: exact parent Key Vault is unresolved"]
+    current_vault = current_vaults.get(vault.address)
+    if current_vault is None:
+        current_vault = _vault_with_current_access_policies(vault, resources, context)
+        current_vaults[vault.address] = current_vault
+    return _key_authorization_posture_for_vault(key, current_vault, assignments, context)
+
+
+def _vault_with_current_access_policies(
+    vault: NormalizedResource,
+    resources: Sequence[NormalizedResource],
+    context: AzureDecorationContext,
+) -> NormalizedResource:
+    vault_facts = azure_facts(vault)
+    stored_policies = vault_facts.key_vault_access_policies
+    standalone_sources = {
+        str(policy["source"])
+        for policy in stored_policies
+        if policy.get("management_mode") == "standalone_access_policy" and policy.get("source")
+    }
+    policies = [
+        dict(policy) for policy in stored_policies if policy.get("management_mode") != "standalone_access_policy"
+    ]
+    merged_uncertainties: list[str] = []
+    for policy_resource in resources:
+        if policy_resource.resource_type != AzureResourceType.KEY_VAULT_ACCESS_POLICY:
+            continue
+        policy_facts = azure_facts(policy_resource)
+        resolved = context.index.resolve(
+            policy_facts.key_vault_reference,
+            source=policy_resource,
+            resource_types={AzureResourceType.KEY_VAULT},
+        )
+        standalone_sources.add(policy_resource.address)
+        if resolved is None or resolved.address != vault.address:
+            continue
+        for policy in policy_facts.key_vault_access_policies:
+            if policy not in policies:
+                policies.append(dict(policy))
+        merged_uncertainties.extend(
+            f"{policy_resource.address}: {uncertainty}"
+            for uncertainty in policy_facts.key_vault_authorization_uncertainties
+        )
+    retained_uncertainties = [
+        uncertainty
+        for uncertainty in vault_facts.key_vault_authorization_uncertainties
+        if not any(uncertainty.startswith(f"{source}:") for source in standalone_sources)
+    ]
+    current_vault = replace(vault, metadata=vault.metadata_snapshot())
+    current_facts = azure_facts(current_vault)
+    current_facts.set(AzureResourceMetadata.KEY_VAULT_ACCESS_POLICIES, policies)
+    current_facts.set(
+        AzureResourceMetadata.KEY_VAULT_AUTHORIZATION_UNCERTAINTIES,
+        [*retained_uncertainties, *merged_uncertainties],
+    )
+    return current_vault
 
 
 def _authorization_model(
