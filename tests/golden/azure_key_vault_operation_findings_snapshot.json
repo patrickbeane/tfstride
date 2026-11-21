@@ -1,0 +1,1062 @@
+{
+ "access policy decrypt only": [
+  {
+   "affected_resources": [
+    "azurerm_linux_web_app.orders",
+    "azurerm_key_vault.orders",
+    "azurerm_key_vault_key.signing",
+    "azurerm_key_vault_access_policy.runtime"
+   ],
+   "evidence": [
+    {
+     "count": 5,
+     "key": "public_endpoint",
+     "sha256": "613ea11100fbeca227db9d812338a73446024de31dccb5befd37ebe8261bed0b"
+    },
+    {
+     "count": 7,
+     "key": "effective_public_ingress",
+     "sha256": "d3c2ed3a8aef8f3e563ad01958005842599eb65b24fb800f670c4258801e0844"
+    },
+    {
+     "count": 4,
+     "key": "app_service_authentication",
+     "sha256": "64de9f0fbdcc0655a667cffdc2ee531d1be69aa1d14edb4c98ca55f078f776de"
+    },
+    {
+     "count": 1,
+     "key": "runtime_identity",
+     "sha256": "e8793acf3eb86b5062b5db0e20d9e7e7efc14e830a359667165698c56966b35f"
+    },
+    {
+     "count": 1,
+     "key": "key_vault_operation_paths",
+     "sha256": "d00f0b81df79c844689c3f737099481b032e5aff71545a1e7fc9dbaf1aa40753"
+    },
+    {
+     "count": 1,
+     "key": "scope_breadth",
+     "sha256": "e141caf59c21c46ec1d563fcfdcaed2535defaca59aaa611504bbdb33006cf95"
+    },
+    {
+     "count": 4,
+     "key": "authorization_scope",
+     "sha256": "0baa05ea1741e7cb722d9b2e3fd1abc6c28e8454b43baff46197e100692c7af7"
+    },
+    {
+     "count": 1,
+     "key": "downstream_dependencies",
+     "sha256": "c27596c0d7a0166524a6f747b50c18f560a19824355dd82184db8f5d70115d33"
+    }
+   ],
+   "rationale": "azurerm_linux_web_app.orders permits external ingress within the evidenced scope and its runtime managed identity has deterministic Key Vault decrypt authority on 1 exact modeled key(s). A compromise of the public workload could submit ciphertext to Key Vault decrypt operations, creating plaintext-recovery and information-disclosure potential. At least one modeled grant is subscription-, resource-group-, or vault-scoped, so its potential blast radius is broader than an exact-key grant. The modeled key count is not an inventory of every out-of-plan key covered by that parent scope. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can recover application plaintext, or can produce a signature accepted by a relying application. No resolved Key Vault-protected Storage or Service Bus access convergence is modeled for these keys.",
+   "rule_id": "azure-public-app-service-key-vault-decrypt-access",
+   "severity": "high"
+  }
+ ],
+ "access policy system identity": [
+  {
+   "affected_resources": [
+    "azurerm_linux_web_app.orders",
+    "azurerm_key_vault.orders",
+    "azurerm_key_vault_key.signing",
+    "azurerm_key_vault_access_policy.runtime"
+   ],
+   "evidence": [
+    {
+     "count": 5,
+     "key": "public_endpoint",
+     "sha256": "613ea11100fbeca227db9d812338a73446024de31dccb5befd37ebe8261bed0b"
+    },
+    {
+     "count": 7,
+     "key": "effective_public_ingress",
+     "sha256": "d3c2ed3a8aef8f3e563ad01958005842599eb65b24fb800f670c4258801e0844"
+    },
+    {
+     "count": 4,
+     "key": "app_service_authentication",
+     "sha256": "64de9f0fbdcc0655a667cffdc2ee531d1be69aa1d14edb4c98ca55f078f776de"
+    },
+    {
+     "count": 1,
+     "key": "runtime_identity",
+     "sha256": "e8793acf3eb86b5062b5db0e20d9e7e7efc14e830a359667165698c56966b35f"
+    },
+    {
+     "count": 2,
+     "key": "key_vault_operation_paths",
+     "sha256": "eacff0ab3fdff073c201fa9bce14704326d54eeaa96e65fbc74e9132928c7adc"
+    },
+    {
+     "count": 1,
+     "key": "scope_breadth",
+     "sha256": "e141caf59c21c46ec1d563fcfdcaed2535defaca59aaa611504bbdb33006cf95"
+    },
+    {
+     "count": 4,
+     "key": "authorization_scope",
+     "sha256": "4f12bb232d73c5aa8c53f9927a1ea855bd6dda9b451fa0c661d172ca80d9ac89"
+    },
+    {
+     "count": 1,
+     "key": "downstream_dependencies",
+     "sha256": "c27596c0d7a0166524a6f747b50c18f560a19824355dd82184db8f5d70115d33"
+    }
+   ],
+   "rationale": "azurerm_linux_web_app.orders permits external ingress within the evidenced scope and its runtime managed identity has deterministic Key Vault decrypt and unwrap authority on 1 exact modeled key(s). A compromise of the public workload could submit ciphertext or wrapped key material to Key Vault decrypt and unwrap operations, creating plaintext-recovery and information-disclosure potential. At least one modeled grant is subscription-, resource-group-, or vault-scoped, so its potential blast radius is broader than an exact-key grant. The modeled key count is not an inventory of every out-of-plan key covered by that parent scope. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can recover application plaintext, or can produce a signature accepted by a relying application. No resolved Key Vault-protected Storage or Service Bus access convergence is modeled for these keys.",
+   "rule_id": "azure-public-app-service-key-vault-decrypt-access",
+   "severity": "high"
+  },
+  {
+   "affected_resources": [
+    "azurerm_linux_web_app.orders",
+    "azurerm_key_vault.orders",
+    "azurerm_key_vault_key.signing",
+    "azurerm_key_vault_access_policy.runtime"
+   ],
+   "evidence": [
+    {
+     "count": 5,
+     "key": "public_endpoint",
+     "sha256": "613ea11100fbeca227db9d812338a73446024de31dccb5befd37ebe8261bed0b"
+    },
+    {
+     "count": 7,
+     "key": "effective_public_ingress",
+     "sha256": "d3c2ed3a8aef8f3e563ad01958005842599eb65b24fb800f670c4258801e0844"
+    },
+    {
+     "count": 4,
+     "key": "app_service_authentication",
+     "sha256": "64de9f0fbdcc0655a667cffdc2ee531d1be69aa1d14edb4c98ca55f078f776de"
+    },
+    {
+     "count": 1,
+     "key": "runtime_identity",
+     "sha256": "e8793acf3eb86b5062b5db0e20d9e7e7efc14e830a359667165698c56966b35f"
+    },
+    {
+     "count": 1,
+     "key": "key_vault_operation_paths",
+     "sha256": "c5681942b78821caaadbb569ff517089d3b265030cb4cb20ed200ddb57b2b0b7"
+    },
+    {
+     "count": 1,
+     "key": "scope_breadth",
+     "sha256": "e141caf59c21c46ec1d563fcfdcaed2535defaca59aaa611504bbdb33006cf95"
+    },
+    {
+     "count": 4,
+     "key": "authorization_scope",
+     "sha256": "a4fa68c7f2a4693a6a9c5c826ec0856bff55276bc34bb7415d809fb1bbe43f82"
+    }
+   ],
+   "rationale": "azurerm_linux_web_app.orders permits external ingress within the evidenced scope and its runtime managed identity has deterministic Key Vault signing authority on 1 exact modeled key(s). A compromise of the public workload could generate Key Vault signatures, creating spoofing potential. At least one modeled grant is subscription-, resource-group-, or vault-scoped, so its potential blast radius is broader than an exact-key grant. The modeled key count is not an inventory of every out-of-plan key covered by that parent scope. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can recover application plaintext, or can produce a signature accepted by a relying application.",
+   "rule_id": "azure-public-app-service-key-vault-signing-access",
+   "severity": "high"
+  }
+ ],
+ "access policy user-assigned identity": [
+  {
+   "affected_resources": [
+    "azurerm_linux_function_app.orders_worker",
+    "azurerm_user_assigned_identity.orders_runtime",
+    "azurerm_key_vault.orders",
+    "azurerm_key_vault_key.signing",
+    "azurerm_key_vault_access_policy.runtime"
+   ],
+   "evidence": [
+    {
+     "count": 5,
+     "key": "public_endpoint",
+     "sha256": "801c41b96d6b1f5dd6feefd8018b15e65b5d027ae212044083e509735e820926"
+    },
+    {
+     "count": 7,
+     "key": "effective_public_ingress",
+     "sha256": "141e8a08c3444226268b25c99c815b24c19a2e93c471b6f48f7c7f3c0a168ebf"
+    },
+    {
+     "count": 4,
+     "key": "app_service_authentication",
+     "sha256": "71a551e24398ded84b44ce2459615510cf5e368ef75f71bc6990626334d1e915"
+    },
+    {
+     "count": 1,
+     "key": "runtime_identity",
+     "sha256": "dacb42927173390c61bdd3df330e7a57db25b14c3f7e263e3b097ff096f35f76"
+    },
+    {
+     "count": 2,
+     "key": "key_vault_operation_paths",
+     "sha256": "eacff0ab3fdff073c201fa9bce14704326d54eeaa96e65fbc74e9132928c7adc"
+    },
+    {
+     "count": 1,
+     "key": "scope_breadth",
+     "sha256": "e141caf59c21c46ec1d563fcfdcaed2535defaca59aaa611504bbdb33006cf95"
+    },
+    {
+     "count": 4,
+     "key": "authorization_scope",
+     "sha256": "4f12bb232d73c5aa8c53f9927a1ea855bd6dda9b451fa0c661d172ca80d9ac89"
+    },
+    {
+     "count": 1,
+     "key": "downstream_dependencies",
+     "sha256": "c27596c0d7a0166524a6f747b50c18f560a19824355dd82184db8f5d70115d33"
+    }
+   ],
+   "rationale": "azurerm_linux_function_app.orders_worker permits external ingress within the evidenced scope and its runtime managed identity has deterministic Key Vault decrypt and unwrap authority on 1 exact modeled key(s). A compromise of the public workload could submit ciphertext or wrapped key material to Key Vault decrypt and unwrap operations, creating plaintext-recovery and information-disclosure potential. At least one modeled grant is subscription-, resource-group-, or vault-scoped, so its potential blast radius is broader than an exact-key grant. The modeled key count is not an inventory of every out-of-plan key covered by that parent scope. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can recover application plaintext, or can produce a signature accepted by a relying application. No resolved Key Vault-protected Storage or Service Bus access convergence is modeled for these keys.",
+   "rule_id": "azure-public-app-service-key-vault-decrypt-access",
+   "severity": "high"
+  },
+  {
+   "affected_resources": [
+    "azurerm_linux_function_app.orders_worker",
+    "azurerm_user_assigned_identity.orders_runtime",
+    "azurerm_key_vault.orders",
+    "azurerm_key_vault_key.signing",
+    "azurerm_key_vault_access_policy.runtime"
+   ],
+   "evidence": [
+    {
+     "count": 5,
+     "key": "public_endpoint",
+     "sha256": "801c41b96d6b1f5dd6feefd8018b15e65b5d027ae212044083e509735e820926"
+    },
+    {
+     "count": 7,
+     "key": "effective_public_ingress",
+     "sha256": "141e8a08c3444226268b25c99c815b24c19a2e93c471b6f48f7c7f3c0a168ebf"
+    },
+    {
+     "count": 4,
+     "key": "app_service_authentication",
+     "sha256": "71a551e24398ded84b44ce2459615510cf5e368ef75f71bc6990626334d1e915"
+    },
+    {
+     "count": 1,
+     "key": "runtime_identity",
+     "sha256": "dacb42927173390c61bdd3df330e7a57db25b14c3f7e263e3b097ff096f35f76"
+    },
+    {
+     "count": 1,
+     "key": "key_vault_operation_paths",
+     "sha256": "c5681942b78821caaadbb569ff517089d3b265030cb4cb20ed200ddb57b2b0b7"
+    },
+    {
+     "count": 1,
+     "key": "scope_breadth",
+     "sha256": "e141caf59c21c46ec1d563fcfdcaed2535defaca59aaa611504bbdb33006cf95"
+    },
+    {
+     "count": 4,
+     "key": "authorization_scope",
+     "sha256": "a4fa68c7f2a4693a6a9c5c826ec0856bff55276bc34bb7415d809fb1bbe43f82"
+    }
+   ],
+   "rationale": "azurerm_linux_function_app.orders_worker permits external ingress within the evidenced scope and its runtime managed identity has deterministic Key Vault signing authority on 1 exact modeled key(s). A compromise of the public workload could generate Key Vault signatures, creating spoofing potential. At least one modeled grant is subscription-, resource-group-, or vault-scoped, so its potential blast radius is broader than an exact-key grant. The modeled key count is not an inventory of every out-of-plan key covered by that parent scope. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can recover application plaintext, or can produce a signature accepted by a relying application.",
+   "rule_id": "azure-public-app-service-key-vault-signing-access",
+   "severity": "high"
+  }
+ ],
+ "rbac custom role": [
+  {
+   "affected_resources": [
+    "azurerm_linux_web_app.orders",
+    "azurerm_key_vault.orders",
+    "azurerm_key_vault_key.signing",
+    "azurerm_role_assignment.custom_key_access",
+    "azurerm_role_definition.key_operator"
+   ],
+   "evidence": [
+    {
+     "count": 5,
+     "key": "public_endpoint",
+     "sha256": "613ea11100fbeca227db9d812338a73446024de31dccb5befd37ebe8261bed0b"
+    },
+    {
+     "count": 7,
+     "key": "effective_public_ingress",
+     "sha256": "d3c2ed3a8aef8f3e563ad01958005842599eb65b24fb800f670c4258801e0844"
+    },
+    {
+     "count": 4,
+     "key": "app_service_authentication",
+     "sha256": "64de9f0fbdcc0655a667cffdc2ee531d1be69aa1d14edb4c98ca55f078f776de"
+    },
+    {
+     "count": 1,
+     "key": "runtime_identity",
+     "sha256": "e8793acf3eb86b5062b5db0e20d9e7e7efc14e830a359667165698c56966b35f"
+    },
+    {
+     "count": 2,
+     "key": "key_vault_operation_paths",
+     "sha256": "90a1ca55c1fe5f56430e1a4e7aea9b653d536cea3089bb7ca65938a879322788"
+    },
+    {
+     "count": 1,
+     "key": "scope_breadth",
+     "sha256": "e141caf59c21c46ec1d563fcfdcaed2535defaca59aaa611504bbdb33006cf95"
+    },
+    {
+     "count": 4,
+     "key": "authorization_scope",
+     "sha256": "4f12bb232d73c5aa8c53f9927a1ea855bd6dda9b451fa0c661d172ca80d9ac89"
+    },
+    {
+     "count": 1,
+     "key": "downstream_dependencies",
+     "sha256": "c27596c0d7a0166524a6f747b50c18f560a19824355dd82184db8f5d70115d33"
+    }
+   ],
+   "rationale": "azurerm_linux_web_app.orders permits external ingress within the evidenced scope and its runtime managed identity has deterministic Key Vault decrypt and unwrap authority on 1 exact modeled key(s). A compromise of the public workload could submit ciphertext or wrapped key material to Key Vault decrypt and unwrap operations, creating plaintext-recovery and information-disclosure potential. At least one modeled grant is subscription-, resource-group-, or vault-scoped, so its potential blast radius is broader than an exact-key grant. The modeled key count is not an inventory of every out-of-plan key covered by that parent scope. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can recover application plaintext, or can produce a signature accepted by a relying application. No resolved Key Vault-protected Storage or Service Bus access convergence is modeled for these keys.",
+   "rule_id": "azure-public-app-service-key-vault-decrypt-access",
+   "severity": "high"
+  },
+  {
+   "affected_resources": [
+    "azurerm_linux_web_app.orders",
+    "azurerm_key_vault.orders",
+    "azurerm_key_vault_key.signing",
+    "azurerm_role_assignment.custom_key_access",
+    "azurerm_role_definition.key_operator"
+   ],
+   "evidence": [
+    {
+     "count": 5,
+     "key": "public_endpoint",
+     "sha256": "613ea11100fbeca227db9d812338a73446024de31dccb5befd37ebe8261bed0b"
+    },
+    {
+     "count": 7,
+     "key": "effective_public_ingress",
+     "sha256": "d3c2ed3a8aef8f3e563ad01958005842599eb65b24fb800f670c4258801e0844"
+    },
+    {
+     "count": 4,
+     "key": "app_service_authentication",
+     "sha256": "64de9f0fbdcc0655a667cffdc2ee531d1be69aa1d14edb4c98ca55f078f776de"
+    },
+    {
+     "count": 1,
+     "key": "runtime_identity",
+     "sha256": "e8793acf3eb86b5062b5db0e20d9e7e7efc14e830a359667165698c56966b35f"
+    },
+    {
+     "count": 1,
+     "key": "key_vault_operation_paths",
+     "sha256": "8b7a058e3b42194c8447c3a809c5e851a5d10ba4484b808580c9175dec9a3f59"
+    },
+    {
+     "count": 1,
+     "key": "scope_breadth",
+     "sha256": "e141caf59c21c46ec1d563fcfdcaed2535defaca59aaa611504bbdb33006cf95"
+    },
+    {
+     "count": 4,
+     "key": "authorization_scope",
+     "sha256": "a4fa68c7f2a4693a6a9c5c826ec0856bff55276bc34bb7415d809fb1bbe43f82"
+    }
+   ],
+   "rationale": "azurerm_linux_web_app.orders permits external ingress within the evidenced scope and its runtime managed identity has deterministic Key Vault signing authority on 1 exact modeled key(s). A compromise of the public workload could generate Key Vault signatures, creating spoofing potential. At least one modeled grant is subscription-, resource-group-, or vault-scoped, so its potential blast radius is broader than an exact-key grant. The modeled key count is not an inventory of every out-of-plan key covered by that parent scope. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can recover application plaintext, or can produce a signature accepted by a relying application.",
+   "rule_id": "azure-public-app-service-key-vault-signing-access",
+   "severity": "high"
+  }
+ ],
+ "rbac exact key scope": [
+  {
+   "affected_resources": [
+    "azurerm_linux_web_app.orders",
+    "azurerm_key_vault.orders",
+    "azurerm_key_vault_key.signing",
+    "azurerm_role_assignment.key_access"
+   ],
+   "evidence": [
+    {
+     "count": 5,
+     "key": "public_endpoint",
+     "sha256": "613ea11100fbeca227db9d812338a73446024de31dccb5befd37ebe8261bed0b"
+    },
+    {
+     "count": 7,
+     "key": "effective_public_ingress",
+     "sha256": "d3c2ed3a8aef8f3e563ad01958005842599eb65b24fb800f670c4258801e0844"
+    },
+    {
+     "count": 4,
+     "key": "app_service_authentication",
+     "sha256": "64de9f0fbdcc0655a667cffdc2ee531d1be69aa1d14edb4c98ca55f078f776de"
+    },
+    {
+     "count": 1,
+     "key": "runtime_identity",
+     "sha256": "e8793acf3eb86b5062b5db0e20d9e7e7efc14e830a359667165698c56966b35f"
+    },
+    {
+     "count": 2,
+     "key": "key_vault_operation_paths",
+     "sha256": "01be9d287e1d3da44fcba26181f14a488ad2ae6e5327207c1811fbb3c121f68f"
+    },
+    {
+     "count": 1,
+     "key": "scope_breadth",
+     "sha256": "9b17e6af830992253f692f3aaf7e7b31e1a8cab07e5a88ce1d63e9f900c7037d"
+    },
+    {
+     "count": 3,
+     "key": "authorization_scope",
+     "sha256": "35f90b7b45a3a9288ee9e2b1d74f982e5573dfe28ae39faed1177b8af665c08b"
+    },
+    {
+     "count": 1,
+     "key": "downstream_dependencies",
+     "sha256": "c27596c0d7a0166524a6f747b50c18f560a19824355dd82184db8f5d70115d33"
+    }
+   ],
+   "rationale": "azurerm_linux_web_app.orders permits external ingress within the evidenced scope and its runtime managed identity has deterministic Key Vault decrypt and unwrap authority on 1 exact modeled key(s). A compromise of the public workload could submit ciphertext or wrapped key material to Key Vault decrypt and unwrap operations, creating plaintext-recovery and information-disclosure potential. The modeled grants are limited to exact versionless Key Vault key scope. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can recover application plaintext, or can produce a signature accepted by a relying application. No resolved Key Vault-protected Storage or Service Bus access convergence is modeled for these keys.",
+   "rule_id": "azure-public-app-service-key-vault-decrypt-access",
+   "severity": "high"
+  },
+  {
+   "affected_resources": [
+    "azurerm_linux_web_app.orders",
+    "azurerm_key_vault.orders",
+    "azurerm_key_vault_key.signing",
+    "azurerm_role_assignment.key_access"
+   ],
+   "evidence": [
+    {
+     "count": 5,
+     "key": "public_endpoint",
+     "sha256": "613ea11100fbeca227db9d812338a73446024de31dccb5befd37ebe8261bed0b"
+    },
+    {
+     "count": 7,
+     "key": "effective_public_ingress",
+     "sha256": "d3c2ed3a8aef8f3e563ad01958005842599eb65b24fb800f670c4258801e0844"
+    },
+    {
+     "count": 4,
+     "key": "app_service_authentication",
+     "sha256": "64de9f0fbdcc0655a667cffdc2ee531d1be69aa1d14edb4c98ca55f078f776de"
+    },
+    {
+     "count": 1,
+     "key": "runtime_identity",
+     "sha256": "e8793acf3eb86b5062b5db0e20d9e7e7efc14e830a359667165698c56966b35f"
+    },
+    {
+     "count": 1,
+     "key": "key_vault_operation_paths",
+     "sha256": "f22600c3d907b7e34529e969b55f8264c612cf60e11c0c22daccbb572c45719e"
+    },
+    {
+     "count": 1,
+     "key": "scope_breadth",
+     "sha256": "9b17e6af830992253f692f3aaf7e7b31e1a8cab07e5a88ce1d63e9f900c7037d"
+    },
+    {
+     "count": 3,
+     "key": "authorization_scope",
+     "sha256": "91b9d7bb31fef8105ac19e6880d4a61451e4f1bdd87e609331b15bed063732df"
+    }
+   ],
+   "rationale": "azurerm_linux_web_app.orders permits external ingress within the evidenced scope and its runtime managed identity has deterministic Key Vault signing authority on 1 exact modeled key(s). A compromise of the public workload could generate Key Vault signatures, creating spoofing potential. The modeled grants are limited to exact versionless Key Vault key scope. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can recover application plaintext, or can produce a signature accepted by a relying application.",
+   "rule_id": "azure-public-app-service-key-vault-signing-access",
+   "severity": "high"
+  }
+ ],
+ "rbac resource group scope": [
+  {
+   "affected_resources": [
+    "azurerm_linux_web_app.orders",
+    "azurerm_key_vault.orders",
+    "azurerm_key_vault_key.signing",
+    "azurerm_role_assignment.key_access"
+   ],
+   "evidence": [
+    {
+     "count": 5,
+     "key": "public_endpoint",
+     "sha256": "613ea11100fbeca227db9d812338a73446024de31dccb5befd37ebe8261bed0b"
+    },
+    {
+     "count": 7,
+     "key": "effective_public_ingress",
+     "sha256": "d3c2ed3a8aef8f3e563ad01958005842599eb65b24fb800f670c4258801e0844"
+    },
+    {
+     "count": 4,
+     "key": "app_service_authentication",
+     "sha256": "64de9f0fbdcc0655a667cffdc2ee531d1be69aa1d14edb4c98ca55f078f776de"
+    },
+    {
+     "count": 1,
+     "key": "runtime_identity",
+     "sha256": "e8793acf3eb86b5062b5db0e20d9e7e7efc14e830a359667165698c56966b35f"
+    },
+    {
+     "count": 2,
+     "key": "key_vault_operation_paths",
+     "sha256": "a0fb3012960d7e62929d55a2a5a3f8609ac66ab81f09e83f8244b9b185081772"
+    },
+    {
+     "count": 1,
+     "key": "scope_breadth",
+     "sha256": "0530b6d022fbaace934f79d53d7166c60c2423d8a24189ba753bfcc409f95582"
+    },
+    {
+     "count": 4,
+     "key": "authorization_scope",
+     "sha256": "4f12bb232d73c5aa8c53f9927a1ea855bd6dda9b451fa0c661d172ca80d9ac89"
+    },
+    {
+     "count": 1,
+     "key": "downstream_dependencies",
+     "sha256": "c27596c0d7a0166524a6f747b50c18f560a19824355dd82184db8f5d70115d33"
+    },
+    {
+     "count": 1,
+     "key": "downstream_dependency_uncertainties",
+     "sha256": "c57ba6c4918b6a1bce6cd07c67dc4005938f96271f8039c72308ba2d081ac9e5"
+    }
+   ],
+   "rationale": "azurerm_linux_web_app.orders permits external ingress within the evidenced scope and its runtime managed identity has deterministic Key Vault decrypt and unwrap authority on 1 exact modeled key(s). A compromise of the public workload could submit ciphertext or wrapped key material to Key Vault decrypt and unwrap operations, creating plaintext-recovery and information-disclosure potential. At least one modeled grant is subscription-, resource-group-, or vault-scoped, so its potential blast radius is broader than an exact-key grant. The modeled key count is not an inventory of every out-of-plan key covered by that parent scope. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can recover application plaintext, or can produce a signature accepted by a relying application. No resolved Key Vault-protected Storage or Service Bus access convergence is modeled for these keys.",
+   "rule_id": "azure-public-app-service-key-vault-decrypt-access",
+   "severity": "high"
+  },
+  {
+   "affected_resources": [
+    "azurerm_linux_web_app.orders",
+    "azurerm_key_vault.orders",
+    "azurerm_key_vault_key.signing",
+    "azurerm_role_assignment.key_access"
+   ],
+   "evidence": [
+    {
+     "count": 5,
+     "key": "public_endpoint",
+     "sha256": "613ea11100fbeca227db9d812338a73446024de31dccb5befd37ebe8261bed0b"
+    },
+    {
+     "count": 7,
+     "key": "effective_public_ingress",
+     "sha256": "d3c2ed3a8aef8f3e563ad01958005842599eb65b24fb800f670c4258801e0844"
+    },
+    {
+     "count": 4,
+     "key": "app_service_authentication",
+     "sha256": "64de9f0fbdcc0655a667cffdc2ee531d1be69aa1d14edb4c98ca55f078f776de"
+    },
+    {
+     "count": 1,
+     "key": "runtime_identity",
+     "sha256": "e8793acf3eb86b5062b5db0e20d9e7e7efc14e830a359667165698c56966b35f"
+    },
+    {
+     "count": 1,
+     "key": "key_vault_operation_paths",
+     "sha256": "0d24c7886b3430bd08dd7e8fba1c11289117a70ea881ce0d1f8b02588aa167bf"
+    },
+    {
+     "count": 1,
+     "key": "scope_breadth",
+     "sha256": "0530b6d022fbaace934f79d53d7166c60c2423d8a24189ba753bfcc409f95582"
+    },
+    {
+     "count": 4,
+     "key": "authorization_scope",
+     "sha256": "a4fa68c7f2a4693a6a9c5c826ec0856bff55276bc34bb7415d809fb1bbe43f82"
+    }
+   ],
+   "rationale": "azurerm_linux_web_app.orders permits external ingress within the evidenced scope and its runtime managed identity has deterministic Key Vault signing authority on 1 exact modeled key(s). A compromise of the public workload could generate Key Vault signatures, creating spoofing potential. At least one modeled grant is subscription-, resource-group-, or vault-scoped, so its potential blast radius is broader than an exact-key grant. The modeled key count is not an inventory of every out-of-plan key covered by that parent scope. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can recover application plaintext, or can produce a signature accepted by a relying application.",
+   "rule_id": "azure-public-app-service-key-vault-signing-access",
+   "severity": "high"
+  }
+ ],
+ "rbac subscription scope": [
+  {
+   "affected_resources": [
+    "azurerm_linux_web_app.orders",
+    "azurerm_key_vault.orders",
+    "azurerm_key_vault_key.signing",
+    "azurerm_role_assignment.key_access"
+   ],
+   "evidence": [
+    {
+     "count": 5,
+     "key": "public_endpoint",
+     "sha256": "613ea11100fbeca227db9d812338a73446024de31dccb5befd37ebe8261bed0b"
+    },
+    {
+     "count": 7,
+     "key": "effective_public_ingress",
+     "sha256": "d3c2ed3a8aef8f3e563ad01958005842599eb65b24fb800f670c4258801e0844"
+    },
+    {
+     "count": 4,
+     "key": "app_service_authentication",
+     "sha256": "64de9f0fbdcc0655a667cffdc2ee531d1be69aa1d14edb4c98ca55f078f776de"
+    },
+    {
+     "count": 1,
+     "key": "runtime_identity",
+     "sha256": "e8793acf3eb86b5062b5db0e20d9e7e7efc14e830a359667165698c56966b35f"
+    },
+    {
+     "count": 2,
+     "key": "key_vault_operation_paths",
+     "sha256": "b976fc5b03bb3d75dae132e3925681b57a44c4860113c22ff1572fc6543446fd"
+    },
+    {
+     "count": 1,
+     "key": "scope_breadth",
+     "sha256": "f5cac6223ef5961e40e049012f0941a1bae91cf122cb68b56458dadc62d65fc2"
+    },
+    {
+     "count": 4,
+     "key": "authorization_scope",
+     "sha256": "4f12bb232d73c5aa8c53f9927a1ea855bd6dda9b451fa0c661d172ca80d9ac89"
+    },
+    {
+     "count": 1,
+     "key": "downstream_dependencies",
+     "sha256": "c27596c0d7a0166524a6f747b50c18f560a19824355dd82184db8f5d70115d33"
+    },
+    {
+     "count": 1,
+     "key": "downstream_dependency_uncertainties",
+     "sha256": "dcdb8ecb745b6cca5f92a18fbf713b7c29a8bfc96c77182bc116d5b788ca482c"
+    }
+   ],
+   "rationale": "azurerm_linux_web_app.orders permits external ingress within the evidenced scope and its runtime managed identity has deterministic Key Vault decrypt and unwrap authority on 1 exact modeled key(s). A compromise of the public workload could submit ciphertext or wrapped key material to Key Vault decrypt and unwrap operations, creating plaintext-recovery and information-disclosure potential. At least one modeled grant is subscription-, resource-group-, or vault-scoped, so its potential blast radius is broader than an exact-key grant. The modeled key count is not an inventory of every out-of-plan key covered by that parent scope. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can recover application plaintext, or can produce a signature accepted by a relying application. No resolved Key Vault-protected Storage or Service Bus access convergence is modeled for these keys.",
+   "rule_id": "azure-public-app-service-key-vault-decrypt-access",
+   "severity": "high"
+  },
+  {
+   "affected_resources": [
+    "azurerm_linux_web_app.orders",
+    "azurerm_key_vault.orders",
+    "azurerm_key_vault_key.signing",
+    "azurerm_role_assignment.key_access"
+   ],
+   "evidence": [
+    {
+     "count": 5,
+     "key": "public_endpoint",
+     "sha256": "613ea11100fbeca227db9d812338a73446024de31dccb5befd37ebe8261bed0b"
+    },
+    {
+     "count": 7,
+     "key": "effective_public_ingress",
+     "sha256": "d3c2ed3a8aef8f3e563ad01958005842599eb65b24fb800f670c4258801e0844"
+    },
+    {
+     "count": 4,
+     "key": "app_service_authentication",
+     "sha256": "64de9f0fbdcc0655a667cffdc2ee531d1be69aa1d14edb4c98ca55f078f776de"
+    },
+    {
+     "count": 1,
+     "key": "runtime_identity",
+     "sha256": "e8793acf3eb86b5062b5db0e20d9e7e7efc14e830a359667165698c56966b35f"
+    },
+    {
+     "count": 1,
+     "key": "key_vault_operation_paths",
+     "sha256": "282e50afc72656d50d45147a0ff10342704a00272e8de6b11135408450ff9960"
+    },
+    {
+     "count": 1,
+     "key": "scope_breadth",
+     "sha256": "f5cac6223ef5961e40e049012f0941a1bae91cf122cb68b56458dadc62d65fc2"
+    },
+    {
+     "count": 4,
+     "key": "authorization_scope",
+     "sha256": "a4fa68c7f2a4693a6a9c5c826ec0856bff55276bc34bb7415d809fb1bbe43f82"
+    }
+   ],
+   "rationale": "azurerm_linux_web_app.orders permits external ingress within the evidenced scope and its runtime managed identity has deterministic Key Vault signing authority on 1 exact modeled key(s). A compromise of the public workload could generate Key Vault signatures, creating spoofing potential. At least one modeled grant is subscription-, resource-group-, or vault-scoped, so its potential blast radius is broader than an exact-key grant. The modeled key count is not an inventory of every out-of-plan key covered by that parent scope. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can recover application plaintext, or can produce a signature accepted by a relying application.",
+   "rule_id": "azure-public-app-service-key-vault-signing-access",
+   "severity": "high"
+  }
+ ],
+ "rbac subscription scope two keys": [
+  {
+   "affected_resources": [
+    "azurerm_linux_web_app.orders",
+    "azurerm_key_vault.orders",
+    "azurerm_key_vault_key.secondary",
+    "azurerm_key_vault_key.signing",
+    "azurerm_role_assignment.key_access"
+   ],
+   "evidence": [
+    {
+     "count": 5,
+     "key": "public_endpoint",
+     "sha256": "613ea11100fbeca227db9d812338a73446024de31dccb5befd37ebe8261bed0b"
+    },
+    {
+     "count": 7,
+     "key": "effective_public_ingress",
+     "sha256": "d3c2ed3a8aef8f3e563ad01958005842599eb65b24fb800f670c4258801e0844"
+    },
+    {
+     "count": 4,
+     "key": "app_service_authentication",
+     "sha256": "64de9f0fbdcc0655a667cffdc2ee531d1be69aa1d14edb4c98ca55f078f776de"
+    },
+    {
+     "count": 1,
+     "key": "runtime_identity",
+     "sha256": "e8793acf3eb86b5062b5db0e20d9e7e7efc14e830a359667165698c56966b35f"
+    },
+    {
+     "count": 3,
+     "key": "key_vault_operation_paths",
+     "sha256": "8dc228137ca45a1c8a9c805e9ceea13feb9234c051202c4f16354773602ec63b"
+    },
+    {
+     "count": 1,
+     "key": "scope_breadth",
+     "sha256": "be482d42abc2909e5a708736170880fd8234e7469776ac811f0ed9724dc8c7bb"
+    },
+    {
+     "count": 4,
+     "key": "authorization_scope",
+     "sha256": "4f12bb232d73c5aa8c53f9927a1ea855bd6dda9b451fa0c661d172ca80d9ac89"
+    },
+    {
+     "count": 1,
+     "key": "downstream_dependencies",
+     "sha256": "c27596c0d7a0166524a6f747b50c18f560a19824355dd82184db8f5d70115d33"
+    },
+    {
+     "count": 1,
+     "key": "downstream_dependency_uncertainties",
+     "sha256": "dcdb8ecb745b6cca5f92a18fbf713b7c29a8bfc96c77182bc116d5b788ca482c"
+    }
+   ],
+   "rationale": "azurerm_linux_web_app.orders permits external ingress within the evidenced scope and its runtime managed identity has deterministic Key Vault decrypt and unwrap authority on 2 exact modeled key(s). A compromise of the public workload could submit ciphertext or wrapped key material to Key Vault decrypt and unwrap operations, creating plaintext-recovery and information-disclosure potential. At least one modeled grant is subscription-, resource-group-, or vault-scoped, so its potential blast radius is broader than an exact-key grant. The modeled key count is not an inventory of every out-of-plan key covered by that parent scope. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can recover application plaintext, or can produce a signature accepted by a relying application. No resolved Key Vault-protected Storage or Service Bus access convergence is modeled for these keys.",
+   "rule_id": "azure-public-app-service-key-vault-decrypt-access",
+   "severity": "high"
+  },
+  {
+   "affected_resources": [
+    "azurerm_linux_web_app.orders",
+    "azurerm_key_vault.orders",
+    "azurerm_key_vault_key.secondary",
+    "azurerm_key_vault_key.signing",
+    "azurerm_role_assignment.key_access"
+   ],
+   "evidence": [
+    {
+     "count": 5,
+     "key": "public_endpoint",
+     "sha256": "613ea11100fbeca227db9d812338a73446024de31dccb5befd37ebe8261bed0b"
+    },
+    {
+     "count": 7,
+     "key": "effective_public_ingress",
+     "sha256": "d3c2ed3a8aef8f3e563ad01958005842599eb65b24fb800f670c4258801e0844"
+    },
+    {
+     "count": 4,
+     "key": "app_service_authentication",
+     "sha256": "64de9f0fbdcc0655a667cffdc2ee531d1be69aa1d14edb4c98ca55f078f776de"
+    },
+    {
+     "count": 1,
+     "key": "runtime_identity",
+     "sha256": "e8793acf3eb86b5062b5db0e20d9e7e7efc14e830a359667165698c56966b35f"
+    },
+    {
+     "count": 2,
+     "key": "key_vault_operation_paths",
+     "sha256": "9dbc49b90d2e11504c760b8b7236d6d501a78fa70ed0c55fe3849e5ce3ed7f8f"
+    },
+    {
+     "count": 1,
+     "key": "scope_breadth",
+     "sha256": "be482d42abc2909e5a708736170880fd8234e7469776ac811f0ed9724dc8c7bb"
+    },
+    {
+     "count": 4,
+     "key": "authorization_scope",
+     "sha256": "a4fa68c7f2a4693a6a9c5c826ec0856bff55276bc34bb7415d809fb1bbe43f82"
+    }
+   ],
+   "rationale": "azurerm_linux_web_app.orders permits external ingress within the evidenced scope and its runtime managed identity has deterministic Key Vault signing authority on 2 exact modeled key(s). A compromise of the public workload could generate Key Vault signatures, creating spoofing potential. At least one modeled grant is subscription-, resource-group-, or vault-scoped, so its potential blast radius is broader than an exact-key grant. The modeled key count is not an inventory of every out-of-plan key covered by that parent scope. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can recover application plaintext, or can produce a signature accepted by a relying application.",
+   "rule_id": "azure-public-app-service-key-vault-signing-access",
+   "severity": "high"
+  }
+ ],
+ "rbac unwrap-only role": [
+  {
+   "affected_resources": [
+    "azurerm_linux_web_app.orders",
+    "azurerm_key_vault.orders",
+    "azurerm_key_vault_key.signing",
+    "azurerm_role_assignment.key_access"
+   ],
+   "evidence": [
+    {
+     "count": 5,
+     "key": "public_endpoint",
+     "sha256": "613ea11100fbeca227db9d812338a73446024de31dccb5befd37ebe8261bed0b"
+    },
+    {
+     "count": 7,
+     "key": "effective_public_ingress",
+     "sha256": "d3c2ed3a8aef8f3e563ad01958005842599eb65b24fb800f670c4258801e0844"
+    },
+    {
+     "count": 4,
+     "key": "app_service_authentication",
+     "sha256": "64de9f0fbdcc0655a667cffdc2ee531d1be69aa1d14edb4c98ca55f078f776de"
+    },
+    {
+     "count": 1,
+     "key": "runtime_identity",
+     "sha256": "e8793acf3eb86b5062b5db0e20d9e7e7efc14e830a359667165698c56966b35f"
+    },
+    {
+     "count": 1,
+     "key": "key_vault_operation_paths",
+     "sha256": "c99d368dc2a8f458aa5bea13b8d6fcaa635d84ad9010b152ca60f56e5582ed1c"
+    },
+    {
+     "count": 1,
+     "key": "scope_breadth",
+     "sha256": "e141caf59c21c46ec1d563fcfdcaed2535defaca59aaa611504bbdb33006cf95"
+    },
+    {
+     "count": 4,
+     "key": "authorization_scope",
+     "sha256": "0b39d1278f9c6b1091b83233dd3aa15a2f36501e6c1724afc0a8e887fe620b62"
+    },
+    {
+     "count": 1,
+     "key": "downstream_dependencies",
+     "sha256": "c27596c0d7a0166524a6f747b50c18f560a19824355dd82184db8f5d70115d33"
+    }
+   ],
+   "rationale": "azurerm_linux_web_app.orders permits external ingress within the evidenced scope and its runtime managed identity has deterministic Key Vault unwrap authority on 1 exact modeled key(s). A compromise of the public workload could submit wrapped key material to Key Vault unwrap operations, creating plaintext-recovery and information-disclosure potential. At least one modeled grant is subscription-, resource-group-, or vault-scoped, so its potential blast radius is broader than an exact-key grant. The modeled key count is not an inventory of every out-of-plan key covered by that parent scope. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can recover application plaintext, or can produce a signature accepted by a relying application. No resolved Key Vault-protected Storage or Service Bus access convergence is modeled for these keys.",
+   "rule_id": "azure-public-app-service-key-vault-decrypt-access",
+   "severity": "high"
+  }
+ ],
+ "rbac user-assigned identity": [
+  {
+   "affected_resources": [
+    "azurerm_linux_function_app.orders_worker",
+    "azurerm_user_assigned_identity.orders_runtime",
+    "azurerm_key_vault.orders",
+    "azurerm_key_vault_key.signing",
+    "azurerm_role_assignment.key_access"
+   ],
+   "evidence": [
+    {
+     "count": 5,
+     "key": "public_endpoint",
+     "sha256": "801c41b96d6b1f5dd6feefd8018b15e65b5d027ae212044083e509735e820926"
+    },
+    {
+     "count": 7,
+     "key": "effective_public_ingress",
+     "sha256": "141e8a08c3444226268b25c99c815b24c19a2e93c471b6f48f7c7f3c0a168ebf"
+    },
+    {
+     "count": 4,
+     "key": "app_service_authentication",
+     "sha256": "71a551e24398ded84b44ce2459615510cf5e368ef75f71bc6990626334d1e915"
+    },
+    {
+     "count": 1,
+     "key": "runtime_identity",
+     "sha256": "dacb42927173390c61bdd3df330e7a57db25b14c3f7e263e3b097ff096f35f76"
+    },
+    {
+     "count": 2,
+     "key": "key_vault_operation_paths",
+     "sha256": "3b879a679503036ae5a127faf1b751e23d11ecab85c21e542cf05f00d93b8b87"
+    },
+    {
+     "count": 1,
+     "key": "scope_breadth",
+     "sha256": "e141caf59c21c46ec1d563fcfdcaed2535defaca59aaa611504bbdb33006cf95"
+    },
+    {
+     "count": 4,
+     "key": "authorization_scope",
+     "sha256": "4f12bb232d73c5aa8c53f9927a1ea855bd6dda9b451fa0c661d172ca80d9ac89"
+    },
+    {
+     "count": 1,
+     "key": "downstream_dependencies",
+     "sha256": "c27596c0d7a0166524a6f747b50c18f560a19824355dd82184db8f5d70115d33"
+    }
+   ],
+   "rationale": "azurerm_linux_function_app.orders_worker permits external ingress within the evidenced scope and its runtime managed identity has deterministic Key Vault decrypt and unwrap authority on 1 exact modeled key(s). A compromise of the public workload could submit ciphertext or wrapped key material to Key Vault decrypt and unwrap operations, creating plaintext-recovery and information-disclosure potential. At least one modeled grant is subscription-, resource-group-, or vault-scoped, so its potential blast radius is broader than an exact-key grant. The modeled key count is not an inventory of every out-of-plan key covered by that parent scope. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can recover application plaintext, or can produce a signature accepted by a relying application. No resolved Key Vault-protected Storage or Service Bus access convergence is modeled for these keys.",
+   "rule_id": "azure-public-app-service-key-vault-decrypt-access",
+   "severity": "high"
+  },
+  {
+   "affected_resources": [
+    "azurerm_linux_function_app.orders_worker",
+    "azurerm_user_assigned_identity.orders_runtime",
+    "azurerm_key_vault.orders",
+    "azurerm_key_vault_key.signing",
+    "azurerm_role_assignment.key_access"
+   ],
+   "evidence": [
+    {
+     "count": 5,
+     "key": "public_endpoint",
+     "sha256": "801c41b96d6b1f5dd6feefd8018b15e65b5d027ae212044083e509735e820926"
+    },
+    {
+     "count": 7,
+     "key": "effective_public_ingress",
+     "sha256": "141e8a08c3444226268b25c99c815b24c19a2e93c471b6f48f7c7f3c0a168ebf"
+    },
+    {
+     "count": 4,
+     "key": "app_service_authentication",
+     "sha256": "71a551e24398ded84b44ce2459615510cf5e368ef75f71bc6990626334d1e915"
+    },
+    {
+     "count": 1,
+     "key": "runtime_identity",
+     "sha256": "dacb42927173390c61bdd3df330e7a57db25b14c3f7e263e3b097ff096f35f76"
+    },
+    {
+     "count": 1,
+     "key": "key_vault_operation_paths",
+     "sha256": "e1513fb14533fa0d1e52dd4303cd774f5859f4ab617893532f4644a64f33bd92"
+    },
+    {
+     "count": 1,
+     "key": "scope_breadth",
+     "sha256": "e141caf59c21c46ec1d563fcfdcaed2535defaca59aaa611504bbdb33006cf95"
+    },
+    {
+     "count": 4,
+     "key": "authorization_scope",
+     "sha256": "a4fa68c7f2a4693a6a9c5c826ec0856bff55276bc34bb7415d809fb1bbe43f82"
+    }
+   ],
+   "rationale": "azurerm_linux_function_app.orders_worker permits external ingress within the evidenced scope and its runtime managed identity has deterministic Key Vault signing authority on 1 exact modeled key(s). A compromise of the public workload could generate Key Vault signatures, creating spoofing potential. At least one modeled grant is subscription-, resource-group-, or vault-scoped, so its potential blast radius is broader than an exact-key grant. The modeled key count is not an inventory of every out-of-plan key covered by that parent scope. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can recover application plaintext, or can produce a signature accepted by a relying application.",
+   "rule_id": "azure-public-app-service-key-vault-signing-access",
+   "severity": "high"
+  }
+ ],
+ "rbac vault scope": [
+  {
+   "affected_resources": [
+    "azurerm_linux_web_app.orders",
+    "azurerm_key_vault.orders",
+    "azurerm_key_vault_key.signing",
+    "azurerm_role_assignment.key_access"
+   ],
+   "evidence": [
+    {
+     "count": 5,
+     "key": "public_endpoint",
+     "sha256": "613ea11100fbeca227db9d812338a73446024de31dccb5befd37ebe8261bed0b"
+    },
+    {
+     "count": 7,
+     "key": "effective_public_ingress",
+     "sha256": "d3c2ed3a8aef8f3e563ad01958005842599eb65b24fb800f670c4258801e0844"
+    },
+    {
+     "count": 4,
+     "key": "app_service_authentication",
+     "sha256": "64de9f0fbdcc0655a667cffdc2ee531d1be69aa1d14edb4c98ca55f078f776de"
+    },
+    {
+     "count": 1,
+     "key": "runtime_identity",
+     "sha256": "e8793acf3eb86b5062b5db0e20d9e7e7efc14e830a359667165698c56966b35f"
+    },
+    {
+     "count": 2,
+     "key": "key_vault_operation_paths",
+     "sha256": "3b879a679503036ae5a127faf1b751e23d11ecab85c21e542cf05f00d93b8b87"
+    },
+    {
+     "count": 1,
+     "key": "scope_breadth",
+     "sha256": "e141caf59c21c46ec1d563fcfdcaed2535defaca59aaa611504bbdb33006cf95"
+    },
+    {
+     "count": 4,
+     "key": "authorization_scope",
+     "sha256": "4f12bb232d73c5aa8c53f9927a1ea855bd6dda9b451fa0c661d172ca80d9ac89"
+    },
+    {
+     "count": 1,
+     "key": "downstream_dependencies",
+     "sha256": "c27596c0d7a0166524a6f747b50c18f560a19824355dd82184db8f5d70115d33"
+    }
+   ],
+   "rationale": "azurerm_linux_web_app.orders permits external ingress within the evidenced scope and its runtime managed identity has deterministic Key Vault decrypt and unwrap authority on 1 exact modeled key(s). A compromise of the public workload could submit ciphertext or wrapped key material to Key Vault decrypt and unwrap operations, creating plaintext-recovery and information-disclosure potential. At least one modeled grant is subscription-, resource-group-, or vault-scoped, so its potential blast radius is broader than an exact-key grant. The modeled key count is not an inventory of every out-of-plan key covered by that parent scope. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can recover application plaintext, or can produce a signature accepted by a relying application. No resolved Key Vault-protected Storage or Service Bus access convergence is modeled for these keys.",
+   "rule_id": "azure-public-app-service-key-vault-decrypt-access",
+   "severity": "high"
+  },
+  {
+   "affected_resources": [
+    "azurerm_linux_web_app.orders",
+    "azurerm_key_vault.orders",
+    "azurerm_key_vault_key.signing",
+    "azurerm_role_assignment.key_access"
+   ],
+   "evidence": [
+    {
+     "count": 5,
+     "key": "public_endpoint",
+     "sha256": "613ea11100fbeca227db9d812338a73446024de31dccb5befd37ebe8261bed0b"
+    },
+    {
+     "count": 7,
+     "key": "effective_public_ingress",
+     "sha256": "d3c2ed3a8aef8f3e563ad01958005842599eb65b24fb800f670c4258801e0844"
+    },
+    {
+     "count": 4,
+     "key": "app_service_authentication",
+     "sha256": "64de9f0fbdcc0655a667cffdc2ee531d1be69aa1d14edb4c98ca55f078f776de"
+    },
+    {
+     "count": 1,
+     "key": "runtime_identity",
+     "sha256": "e8793acf3eb86b5062b5db0e20d9e7e7efc14e830a359667165698c56966b35f"
+    },
+    {
+     "count": 1,
+     "key": "key_vault_operation_paths",
+     "sha256": "e1513fb14533fa0d1e52dd4303cd774f5859f4ab617893532f4644a64f33bd92"
+    },
+    {
+     "count": 1,
+     "key": "scope_breadth",
+     "sha256": "e141caf59c21c46ec1d563fcfdcaed2535defaca59aaa611504bbdb33006cf95"
+    },
+    {
+     "count": 4,
+     "key": "authorization_scope",
+     "sha256": "a4fa68c7f2a4693a6a9c5c826ec0856bff55276bc34bb7415d809fb1bbe43f82"
+    }
+   ],
+   "rationale": "azurerm_linux_web_app.orders permits external ingress within the evidenced scope and its runtime managed identity has deterministic Key Vault signing authority on 1 exact modeled key(s). A compromise of the public workload could generate Key Vault signatures, creating spoofing potential. At least one modeled grant is subscription-, resource-group-, or vault-scoped, so its potential blast radius is broader than an exact-key grant. The modeled key count is not an inventory of every out-of-plan key covered by that parent scope. This establishes cryptographic-operation authority, not proof that the workload possesses useful ciphertext, can recover application plaintext, or can produce a signature accepted by a relying application.",
+   "rule_id": "azure-public-app-service-key-vault-signing-access",
+   "severity": "high"
+  }
+ ]
+}
