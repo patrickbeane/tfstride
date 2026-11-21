@@ -20,9 +20,10 @@ import hashlib
 import json
 import sys
 import unittest
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 from tests.helpers.inventory import inventory_with_resources
 from tests.providers.azure.test_azure_app_service_key_vault_operation_paths import (
@@ -47,6 +48,7 @@ from tfstride.analysis.rule_registry import RulePolicy
 from tfstride.analysis.stride_rules import StrideRuleEngine
 from tfstride.models import Finding, ResourceInventory, TerraformResource
 from tfstride.providers.azure.normalizer import AzureNormalizer
+from tfstride.providers.azure.resource_decoration import key_vault_key_authorization
 from tfstride.providers.azure.resource_types import AzureResourceType
 
 SNAPSHOT_PATH = Path(__file__).resolve().parents[2] / "golden" / "azure_key_vault_operation_findings_snapshot.json"
@@ -280,6 +282,140 @@ class AzureKeyVaultOperationReevaluationTests(unittest.TestCase):
             _base(False, _role_assignment()),
             "azurerm_key_vault.orders",
         )
+
+
+def _rule_names(findings: Iterable[Finding]) -> list[str]:
+    return sorted({finding.rule_id for finding in findings})
+
+
+def _replace(inventory: ResourceInventory, fresh: ResourceInventory, *addresses: str) -> ResourceInventory:
+    replacements = {address: fresh.get_by_address(address) for address in addresses}
+    return inventory_with_resources(
+        inventory,
+        (replacements.get(resource.address) or resource for resource in inventory.resources),
+    )
+
+
+def _without(inventory: ResourceInventory, *addresses: str) -> ResourceInventory:
+    return inventory_with_resources(inventory, (r for r in inventory.resources if r.address not in addresses))
+
+
+def _extra_public_app_with_access(index: int) -> list[TerraformResource]:
+    principal = f"00000000-0000-0000-0000-0000000002{index:02d}"
+    app = _web_app()
+    app.address = f"azurerm_linux_web_app.extra{index}"
+    app.name = f"extra{index}"
+    app.values["name"] = f"extra{index}"
+    app.values["id"] = str(app.values["id"]).replace("orders", f"extra{index}")
+    app.values["identity"][0]["principal_id"] = principal
+    assignment = _role_assignment(principal_id=principal)
+    assignment.address = f"azurerm_role_assignment.extra{index}"
+    assignment.name = f"extra{index}"
+    return [_public(app), assignment]
+
+
+class AzureKeyVaultOperationFreshAuthorizationTests(unittest.TestCase):
+    def test_one_engine_reflects_authorization_changes_between_evaluations(self) -> None:
+        engine = StrideRuleEngine()
+        policy = RulePolicy(enabled_rule_ids=_RULES)
+        original = AzureNormalizer().normalize(_base(True, _role_assignment()))
+        changed = AzureNormalizer().normalize(_base(True, _role_assignment(principal_id=_CHANGED_PRINCIPAL)))
+        mixed = _replace(original, changed, "azurerm_role_assignment.key_access")
+
+        def evaluate(inventory: ResourceInventory) -> list[str]:
+            return _rule_names(engine.evaluate(inventory, [], rule_policy=policy))
+
+        self.assertEqual(evaluate(original), sorted(_RULES))
+        self.assertEqual(evaluate(mixed), [])
+        self.assertEqual(evaluate(original), sorted(_RULES))
+        self.assertEqual(evaluate(mixed), [])
+        self.assertEqual(evaluate(original), sorted(_RULES))
+
+    def test_removed_role_assignment_is_rejected(self) -> None:
+        original = AzureNormalizer().normalize(_base(True, _role_assignment()))
+        self.assertEqual(_rule_names(_evaluate(original)), sorted(_RULES))
+        self.assertEqual(_evaluate(_without(original, "azurerm_role_assignment.key_access")), [])
+
+    def test_removed_custom_role_definition_is_rejected(self) -> None:
+        original = AzureNormalizer().normalize(
+            _base(True, _custom_role(_CUSTOM_KEY_ACTIONS), _custom_role_assignment())
+        )
+        self.assertEqual(_rule_names(_evaluate(original)), sorted(_RULES))
+        self.assertEqual(_evaluate(_without(original, "azurerm_role_definition.key_operator")), [])
+
+    def test_removed_standalone_access_policy_is_rejected(self) -> None:
+        original = AzureNormalizer().normalize(_base(False, _access_policy(principal_id=_SYSTEM_PRINCIPAL_ID)))
+        self.assertEqual(_rule_names(_evaluate(original)), sorted(_RULES))
+        self.assertEqual(_evaluate(_without(original, "azurerm_key_vault_access_policy.runtime")), [])
+
+    def test_partial_permission_reduction_keeps_only_the_remaining_operation(self) -> None:
+        original = AzureNormalizer().normalize(
+            _base(False, _access_policy(principal_id=_SYSTEM_PRINCIPAL_ID, key_permissions=("Decrypt", "Sign")))
+        )
+        reduced = AzureNormalizer().normalize(
+            _base(False, _access_policy(principal_id=_SYSTEM_PRINCIPAL_ID, key_permissions=("Decrypt",)))
+        )
+        mixed = _replace(original, reduced, "azurerm_key_vault_access_policy.runtime")
+
+        self.assertEqual(_rule_names(_evaluate(original)), sorted(_RULES))
+        self.assertEqual(_rule_names(_evaluate(mixed)), [_DECRYPT_RULE])
+        self.assertEqual(
+            [_finding_record(finding) for finding in _evaluate(mixed)],
+            [_finding_record(finding) for finding in _evaluate(reduced)],
+        )
+
+    def test_changed_user_assigned_identity_principal_is_rejected(self) -> None:
+        def resources(principal: str) -> list[TerraformResource]:
+            return [
+                _vault(rbac_enabled=True),
+                _key(),
+                _user_assigned_identity(),
+                _public(_function_app()),
+                _role_assignment(principal_id=principal),
+            ]
+
+        original = AzureNormalizer().normalize(resources(_USER_PRINCIPAL_ID))
+        changed = AzureNormalizer().normalize(resources(_CHANGED_PRINCIPAL))
+        mixed = _replace(original, changed, "azurerm_role_assignment.key_access")
+
+        self.assertEqual(_rule_names(_evaluate(original)), sorted(_RULES))
+        self.assertEqual(_evaluate(mixed), _evaluate(changed))
+
+    def test_inline_vault_access_policy_survives_reevaluation(self) -> None:
+        vault = _vault()
+        vault.values["access_policy"] = [
+            {"tenant_id": "tenant-id", "object_id": _SYSTEM_PRINCIPAL_ID, "key_permissions": ["Decrypt", "Sign"]}
+        ]
+        original = AzureNormalizer().normalize([vault, _key(), _public(_web_app())])
+
+        self.assertEqual(_rule_names(_evaluate(original)), sorted(_RULES))
+        self.assertEqual(
+            [_finding_record(finding) for finding in _evaluate(inventory_with_resources(original, original.resources))],
+            [_finding_record(finding) for finding in _evaluate(original)],
+        )
+
+    def test_key_authorization_is_recomputed_once_per_key_per_rule_invocation(self) -> None:
+        def recompute_count_and_findings(app_count: int) -> tuple[int, int]:
+            resources = [*_base(True, _role_assignment())]
+            for index in range(1, app_count):
+                resources.extend(_extra_public_app_with_access(index))
+            inventory = AzureNormalizer().normalize(resources)
+            with mock.patch.object(
+                key_vault_key_authorization,
+                "_key_authorization_posture_for_vault",
+                wraps=key_vault_key_authorization._key_authorization_posture_for_vault,  # pyright: ignore[reportPrivateUsage]
+            ) as recompute:
+                findings = _evaluate(inventory)
+            return recompute.call_count, len(findings)
+
+        one_app_calls, one_app_findings = recompute_count_and_findings(1)
+        many_apps_calls, many_apps_findings = recompute_count_and_findings(6)
+
+        # One key, evaluated by the decrypt rule and the signing rule.
+        self.assertEqual(one_app_calls, len(_RULES))
+        self.assertEqual(many_apps_calls, one_app_calls)
+        self.assertEqual(one_app_findings, len(_RULES))
+        self.assertEqual(many_apps_findings, 6 * len(_RULES))
 
 
 if __name__ == "__main__":
