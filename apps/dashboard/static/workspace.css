@@ -262,10 +262,6 @@
   color: var(--muted);
 }
 
-.upload-status:empty {
-  display: none;
-}
-
 .upload-error {
   color: var(--high);
 }

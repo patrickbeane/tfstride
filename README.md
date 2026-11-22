@@ -292,7 +292,7 @@ uvicorn apps.dashboard.main:app --reload --port 8001
 
 Useful routes:
 
-* `/`: upload form for plan analysis
+* `/`: plan analysis workspace with a built-in report preview
 * `/scenarios`: built-in fixture gallery
 * `/demo/{scenario_id}`: built-in demo scenarios
 * `/analyze`: upload form POST target
@@ -302,7 +302,13 @@ Useful routes:
 
 Deployment examples are included under `apps/dashboard/deploy/`.
 
-Uploads, demo analysis, and lazy scenario catalog construction share one analysis
+The workspace previews the existing ECS/Fargate scenario using current engine output,
+including findings, evidence, a trust boundary, observed controls, and coverage.
+Drag/drop uploads check file size and JSON syntax locally; Terraform validation and
+analysis remain on the server. The native upload form, demo links, and report
+disclosures also work without JavaScript.
+
+Uploads, demo analysis, the lazy report preview, and scenario catalog construction share one analysis
 worker per application process. Analysis, report payload/Markdown generation, and
 HTML report rendering run outside the event loop, leaving health checks responsive.
 Queued work waits asynchronously; a cancelled request waits for any submitted work
@@ -439,6 +445,10 @@ The suite is also compatible with stdlib discovery:
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests
 ```
+
+Optional [dashboard browser checks](tests/dashboard/README.md) exercise native and
+enhanced uploads, keyboard access, responsive layouts, and report navigation using
+Node and Chromium, without npm dependencies.
 
 ## Limitations
 

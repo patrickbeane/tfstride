@@ -61,6 +61,7 @@
               <strong id="plan-filename"></strong>
               <span id="plan-filesize"></span>
               <span class="file-state" id="plan-file-state"></span>
+              <span class="browse-label">Change file</span>
             </div>
             <p class="upload-hint" id="plan-hint">JSON · Up to {{ max_upload_mebibytes }} MiB</p>
             <input
@@ -73,7 +74,7 @@
             >
             <button class="remove-file" id="remove-plan" type="button" hidden>Remove<span class="sr-only"> selected plan</span></button>
           </div>
-          <p class="upload-status" id="upload-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          <p class="upload-status sr-only" id="upload-status" role="status" aria-live="polite" aria-atomic="true"></p>
           <p class="upload-error" id="upload-error" role="alert" hidden></p>
         </div>
 
@@ -109,4 +110,8 @@ terraform show -json tfplan &gt; tfplan.json</code></pre>
 
     {% include "_report_preview.html" %}
   </div>
+{% endblock %}
+
+{% block page_scripts %}
+  <script src="{{ request.url_for('static', path='workspace.js') }}" defer></script>
 {% endblock %}
