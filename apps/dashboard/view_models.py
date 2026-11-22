@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import Request
 
+from apps.dashboard.preview import DemoPreview
 from apps.dashboard.scenarios import PROVIDER_DISPLAY_NAMES
 from tfstride.reporting.report_contract import OperationGapPayload, TFSReportPayload
 
@@ -33,6 +34,7 @@ def _base_context(
     error: str | None = None,
     form_title: str = "tfSTRIDE Report",
     demo_scenarios: tuple[object, ...] = (),
+    demo_preview: DemoPreview | None = None,
     selected_provider: str = "aws",
     scenario_providers: tuple[object, ...] = (),
 ) -> dict[str, object]:
@@ -42,7 +44,9 @@ def _base_context(
         "error": error,
         "form_title": form_title,
         "max_upload_mebibytes": max_upload_bytes // (1024 * 1024),
+        "max_upload_bytes": max_upload_bytes,
         "demo_scenarios": demo_scenarios,
+        "demo_preview": demo_preview,
         "selected_provider": selected_provider,
         "scenario_providers": scenario_providers,
     }

@@ -209,6 +209,9 @@ class DashboardExecutionTests(unittest.IsolatedAsyncioTestCase):
 
         await self._assert_health_during_request(self.app.state.engine, "analyze_plan", "/demo/safe")
 
+    async def test_health_responds_during_cold_landing_preview_analysis(self) -> None:
+        await self._assert_health_during_request(self.app.state.engine, "analyze_plan", "/")
+
     async def test_health_responds_during_html_context_and_template_rendering(self) -> None:
         await self.app.state.execution.run(partial(scenarios.get_demo_scenarios, self.app, self.app.state.engine))
         for endpoint in ("/analyze", "/demo/safe"):

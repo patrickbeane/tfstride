@@ -15,6 +15,7 @@ from apps.dashboard.api_models import (
     ValidationErrorResponseModel,
 )
 from apps.dashboard.execution import DashboardExecution
+from apps.dashboard.preview import get_demo_preview
 from apps.dashboard.scenarios import (
     KNOWN_DEMO_SCENARIO_IDS,
     get_demo_scenarios,
@@ -161,6 +162,7 @@ def register_routes(app: FastAPI, *, template_response: TemplateResponder) -> No
             error=public_dashboard_error_message(exc),
             form_title=title or DEFAULT_REPORT_TITLE,
             demo_scenarios=get_demo_scenarios(request.app, _engine(request.app)),
+            demo_preview=getattr(request.app.state, "demo_preview", None),
         )
         return template_response(request, "index.html", context, status_code=400)
 
@@ -193,7 +195,19 @@ def register_routes(app: FastAPI, *, template_response: TemplateResponder) -> No
         },
     )
     async def index(request: Request) -> HTMLResponse:
-        return template_response(request, "index.html", _base_context(request, max_upload_bytes=MAX_UPLOAD_BYTES))
+        def render_page() -> HTMLResponse:
+            return template_response(
+                request,
+                "index.html",
+                _base_context(
+                    request,
+                    max_upload_bytes=MAX_UPLOAD_BYTES,
+                    form_title="",
+                    demo_preview=get_demo_preview(request.app, _engine(request.app)),
+                ),
+            )
+
+        return await _execution(request.app).run(render_page)
 
     @app.get("/scenarios", response_class=HTMLResponse, include_in_schema=False)
     async def scenarios_page(request: Request) -> HTMLResponse:
