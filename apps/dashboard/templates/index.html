@@ -1,59 +1,112 @@
 {% extends "base.html" %}
 
+{% block page_styles %}
+  <link rel="stylesheet" href="{{ request.url_for('static', path='workspace.css') }}">
+{% endblock %}
+
 {% block content %}
-  <section class="hero-panel">
-    <div class="hero-copy">
-      <p class="eyebrow">Pre-deploy threat review</p>
-      <h1>Upload a Terraform plan and get a deterministic STRIDE-oriented readout.</h1>
+  <section class="workspace-intro" aria-labelledby="page-heading">
+    {% if error %}
+      <h1 id="page-heading">Your plan couldn’t be analyzed.</h1>
+      <p class="lede">Check the file below and choose a Terraform plan JSON file to try again.</p>
+    {% else %}
+      <h1 id="page-heading">See security risks before you deploy.</h1>
       <p class="lede">
-        The dashboard is intentionally thin. It runs the same engine as the CLI and renders the same
-        evidence-backed findings, trust boundaries, observations, and machine-readable JSON contract.
+        Deterministic STRIDE analysis for AWS, Azure, and GCP Terraform plans.
+        The same evidence-backed engine as the CLI.
       </p>
-    </div>
-    <div class="hero-sidecar">
-      <div class="sidecar-card">
-        <h2>What you get</h2>
-        <ul class="feature-list">
-          <li>Findings grouped by severity</li>
-          <li>Trust boundaries and observed controls</li>
-          <li>Raw JSON contract and markdown report</li>
-          <li>No cloud API calls or runtime dependencies</li>
-        </ul>
-      </div>
-    </div>
+      <ul class="workspace-principles" aria-label="Analysis approach">
+        <li>Deterministic analysis</li>
+        <li>No cloud credentials</li>
+        <li>No LLM dependency</li>
+      </ul>
+    {% endif %}
+    <a class="mobile-preview-link" href="#example-report">See an example report <span aria-hidden="true">↓</span></a>
   </section>
 
-  <section class="upload-grid">
-    <div class="panel panel-form">
-      <div class="panel-header">
-        <p class="eyebrow">Analyze</p>
-        <h2>Run the engine against a plan upload</h2>
-      </div>
+  <div class="analysis-workspace">
+    <section class="plan-analyzer" aria-labelledby="analyzer-heading">
+      <header class="workspace-heading">
+        <p class="eyebrow">New analysis</p>
+        <h2 id="analyzer-heading">Analyze a Terraform plan</h2>
+      </header>
       {% if error %}
-        <div class="alert-error">{{ error }}</div>
+        <div class="alert-error" id="server-error" role="alert" tabindex="-1">
+          <strong>{{ error }}</strong>
+          <p>Your title has been kept. Choose a file again to retry.</p>
+        </div>
       {% endif %}
-      <form class="upload-form" action="{{ request.url_for('analyze_view') }}" method="post" enctype="multipart/form-data">
-        <label class="field">
-          <span>Report title</span>
-          <input type="text" name="title" value="{{ form_title }}" maxlength="120">
-        </label>
-        <label class="field file-field">
-          <span>Terraform plan JSON</span>
-          <input type="file" name="plan" accept=".json,application/json" required>
-          <small>Maximum upload size: {{ max_upload_mebibytes }} MiB</small>
-        </label>
+      <form
+        class="upload-form"
+        id="plan-upload"
+        action="{{ request.url_for('analyze_view') }}"
+        method="post"
+        enctype="multipart/form-data"
+        data-max-upload-bytes="{{ max_upload_bytes }}"
+      >
+        <div class="upload-field">
+          <label class="field-label" for="plan-file">Terraform plan JSON</label>
+          <div class="upload-dropzone" id="upload-dropzone">
+            <div class="dropzone-empty" id="dropzone-empty" aria-hidden="true">
+              <svg class="upload-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                <path d="M19 4H8a2 2 0 0 0-2 2v20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V11L19 4Z"/>
+                <path d="M19 4v7h7M16 23V14m-4 4 4-4 4 4"/>
+              </svg>
+              <strong class="enhanced-only">Drop your plan here</strong>
+              <strong class="native-only">Choose your plan</strong>
+              <span class="enhanced-only">or <span class="browse-label">browse files</span></span>
+            </div>
+            <div class="selected-plan" id="selected-plan" hidden aria-hidden="true">
+              <span class="selected-plan-label">Selected file</span>
+              <strong id="plan-filename"></strong>
+              <span id="plan-filesize"></span>
+              <span class="file-state" id="plan-file-state"></span>
+            </div>
+            <p class="upload-hint" id="plan-hint">JSON · Up to {{ max_upload_mebibytes }} MiB</p>
+            <input
+              id="plan-file"
+              type="file"
+              name="plan"
+              accept=".json,application/json"
+              required
+              aria-describedby="plan-hint upload-status upload-error"
+            >
+            <button class="remove-file" id="remove-plan" type="button" hidden>Remove<span class="sr-only"> selected plan</span></button>
+          </div>
+          <p class="upload-status" id="upload-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          <p class="upload-error" id="upload-error" role="alert" hidden></p>
+        </div>
+
         <details class="upload-help">
           <summary>How do I generate this file?</summary>
-          <p>Run these commands in your Terraform working directory, then upload <code>tfplan.json</code>.</p>
-          <pre class="code-block"><code>terraform plan -out tfplan
+          <p>Run in your Terraform directory, then choose <code>tfplan.json</code>.</p>
+          <pre class="plan-command"><code>terraform plan -out tfplan
 terraform show -json tfplan &gt; tfplan.json</code></pre>
         </details>
+
+        <label class="field" for="report-title">
+          <span>Report title <span class="field-optional">(optional)</span></span>
+          <input id="report-title" type="text" name="title" value="{{ form_title }}" placeholder="e.g. Production network" maxlength="120">
+        </label>
+
         <p class="upload-note">
-          Uploaded Terraform plans are analyzed on this server using a temporary file created only for the request.
-          Files are deleted after analysis and are not stored or forwarded to third parties.
+          Plans are analyzed in temporary files on this server, then deleted. They are never retained
+          or forwarded to third parties. No cloud API calls.
         </p>
-        <button class="button-primary" type="submit">Analyze plan</button>
+        <button class="button-primary analyze-button" id="analyze-plan" type="submit">
+          <span id="analyze-label">Analyze plan</span><span aria-hidden="true">→</span>
+        </button>
       </form>
-    </div>
-  </section>
+
+      <p class="demo-shortcuts">
+        No plan handy? Try
+        <a href="{{ request.url_for('scenarios_page') }}?provider=aws" aria-label="Try AWS demos">AWS</a><span aria-hidden="true"> · </span>
+        <a href="{{ request.url_for('scenarios_page') }}?provider=azure" aria-label="Try Azure demos">Azure</a><span aria-hidden="true"> · </span>
+        <a href="{{ request.url_for('scenarios_page') }}?provider=gcp" aria-label="Try GCP demos">GCP</a>
+        demos
+      </p>
+    </section>
+
+    {% include "_report_preview.html" %}
+  </div>
 {% endblock %}

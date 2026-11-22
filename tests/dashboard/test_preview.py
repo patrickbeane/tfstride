@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import importlib.util
 import unittest
+from copy import deepcopy
+from dataclasses import replace
+from html.parser import HTMLParser
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import mock
@@ -20,6 +23,20 @@ if FASTAPI_DEPS_AVAILABLE:
 
     from apps.dashboard.main import create_app
     from apps.dashboard.preview import build_demo_preview, get_demo_preview
+    from apps.dashboard.uploads import MAX_UPLOAD_BYTES
+
+
+class _ElementsById(HTMLParser):
+    def __init__(self, html: str) -> None:
+        super().__init__()
+        self.elements: dict[str, dict[str, str | None]] = {}
+        self.feed(html)
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attributes = dict(attrs)
+        identifier = attributes.get("id")
+        if identifier:
+            self.elements[identifier] = attributes
 
 
 @unittest.skipUnless(FASTAPI_DEPS_AVAILABLE, "dashboard dependencies are not installed")
@@ -79,3 +96,84 @@ class DashboardPreviewTests(unittest.TestCase):
             for app in (first_app, first_app, second_app):
                 self.assertIsNone(get_demo_preview(app, app.state.engine))
         self.assertEqual(build.call_count, 2)
+
+    def test_workspace_renders_real_evidence_and_existing_report_destinations(self) -> None:
+        app = create_app()
+        with TestClient(app) as client:
+            response = client.get("/")
+        preview = app.state.demo_preview
+
+        self.assertIn(f'data-preview-metric="findings">{preview.summary["active_findings"]}</dd>', response.text)
+        self.assertIn(f'data-preview-metric="boundaries">{preview.summary["trust_boundaries"]}</dd>', response.text)
+        self.assertIn(f'data-preview-metric="controls">{preview.observed_controls}</dd>', response.text)
+        for finding in preview.findings:
+            self.assertIn(finding["title"], response.text)
+            self.assertIn(finding["rule_id"], response.text)
+            self.assertIn(finding["evidence"][0]["values"][0], response.text)
+        self.assertIn(preview.boundary["target"], response.text)
+        self.assertIn(preview.observations[0]["title"], response.text)
+        for section in ("findings", "analysis-gaps", "raw-outputs"):
+            self.assertIn(f'href="http://testserver/demo/{preview.scenario.scenario_id}#{section}"', response.text)
+        for provider in ("aws", "azure", "gcp"):
+            self.assertIn(f'href="http://testserver/scenarios?provider={provider}"', response.text)
+        self.assertNotIn(str(FIXTURES_DIR), response.text)
+
+    def test_workspace_keeps_native_upload_contract_labels_and_privacy_notice(self) -> None:
+        with TestClient(create_app()) as client:
+            response = client.get("/")
+        elements = _ElementsById(response.text).elements
+        form = elements["plan-upload"]
+        upload = elements["plan-file"]
+        title = elements["report-title"]
+
+        self.assertEqual(form["action"], "http://testserver/analyze")
+        self.assertEqual(form["method"], "post")
+        self.assertEqual(form["enctype"], "multipart/form-data")
+        self.assertEqual(int(form["data-max-upload-bytes"]), MAX_UPLOAD_BYTES)
+        self.assertEqual((upload["type"], upload["name"]), ("file", "plan"))
+        self.assertIn("required", upload)
+        self.assertNotIn("disabled", upload)
+        self.assertNotIn("hidden", upload)
+        self.assertIn('for="plan-file"', response.text)
+        self.assertEqual(title["name"], "title")
+        self.assertNotIn("required", title)
+        self.assertEqual(elements["upload-status"]["role"], "status")
+        self.assertEqual(elements["upload-error"]["role"], "alert")
+        self.assertEqual(elements["main-content"]["tabindex"], "-1")
+        text = " ".join(response.text.split())
+        for message in ("temporary files on this server, then deleted", "never retained", "forwarded to third parties"):
+            self.assertIn(message, text)
+        self.assertIn("No cloud API calls", text)
+
+    def test_preview_escapes_engine_text_including_evidence(self) -> None:
+        preview = build_demo_preview(TfStride())
+        assert preview is not None
+        finding = deepcopy(preview.findings[0])
+        hostile_text = "<script>alert(1)</script>"
+        finding["title"] = hostile_text
+        finding["affected_resources"] = [hostile_text]
+        finding["evidence"][0]["values"] = [hostile_text]
+        with mock.patch("apps.dashboard.routes.get_demo_preview", return_value=replace(preview, findings=(finding,))):
+            with TestClient(create_app()) as client:
+                response = client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(hostile_text, response.text)
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", response.text)
+
+    def test_invalid_upload_preserves_title_and_returns_an_accessible_retry_form(self) -> None:
+        title = '<production> & "review"'
+        with TestClient(create_app()) as client:
+            client.get("/")
+            response = client.post(
+                "/analyze", data={"title": title}, files={"plan": ("invalid.json", b"{", "application/json")}
+            )
+        elements = _ElementsById(response.text).elements
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(elements["report-title"]["value"], title)
+        self.assertEqual(elements["server-error"]["role"], "alert")
+        self.assertEqual(elements["server-error"]["tabindex"], "-1")
+        self.assertIn("Choose a file again to retry.", response.text)
+        self.assertIn("ECS / Fargate", response.text)
+        self.assertNotIn(title, response.text)

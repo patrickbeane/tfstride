@@ -1,0 +1,104 @@
+<section class="report-preview" id="example-report" aria-labelledby="preview-heading" tabindex="-1">
+  {% if demo_preview %}
+    {% set preview = demo_preview %}
+    {% set report_url = request.url_for('demo_view', scenario_id=preview.scenario.scenario_id) %}
+    <header class="workspace-heading preview-heading">
+      <div>
+        <p class="eyebrow">Built-in example · Report preview</p>
+        <h2 id="preview-heading">{{ preview.scenario.title }}</h2>
+      </div>
+      <span class="preview-provider">{{ preview.provider_display_name }}</span>
+    </header>
+
+    <dl class="preview-metrics" aria-label="Example report totals">
+      <div>
+        <dt>Findings</dt>
+        <dd data-preview-metric="findings">{{ preview.summary.active_findings }}</dd>
+      </div>
+      <div>
+        <dt>Trust boundaries</dt>
+        <dd data-preview-metric="boundaries">{{ preview.summary.trust_boundaries }}</dd>
+      </div>
+      <div>
+        <dt>Observed control{{ "s" if preview.observed_controls != 1 else "" }}</dt>
+        <dd data-preview-metric="controls">{{ preview.observed_controls }}</dd>
+      </div>
+    </dl>
+
+    <section class="preview-findings" aria-labelledby="preview-findings-heading">
+      <div class="preview-section-heading">
+        <h3 id="preview-findings-heading">Findings</h3>
+        <span>Expand to inspect evidence</span>
+      </div>
+      {% for finding in preview.findings %}
+        <details class="preview-finding">
+          <summary>
+            <span class="preview-severity severity-{{ finding.severity }}">{{ finding.severity|upper }}</span>
+            <span class="preview-finding-text">
+              <strong>{{ finding.title }}</strong>
+              <code>{{ finding.affected_resources|join(", ") }}</code>
+            </span>
+            <span class="details-marker" aria-hidden="true"></span>
+          </summary>
+          <div class="preview-evidence" tabindex="0" role="region" aria-label="Evidence for {{ finding.title }}">
+            <p class="preview-rule"><code>{{ finding.rule_id }}</code> · {{ finding.category }}</p>
+            <ul>
+              {% for item in finding.evidence %}
+                <li><strong>{{ item["key"].replace("_", " ") }}</strong><code>{{ item["values"]|join("; ") }}</code></li>
+              {% endfor %}
+            </ul>
+          </div>
+        </details>
+      {% endfor %}
+      <a class="preview-all-findings" href="{{ report_url }}#findings">View all {{ preview.summary.active_findings }} findings <span aria-hidden="true">→</span></a>
+    </section>
+
+    {% if preview.boundary %}
+      <figure class="preview-boundary">
+        <figcaption>Trust boundary</figcaption>
+        <div class="boundary-crossing">
+          <code>{{ "Internet" if preview.boundary.source == "internet" else preview.boundary.source }}</code>
+          <span class="boundary-connector" aria-hidden="true">→</span><span class="sr-only">to</span>
+          <code>{{ preview.boundary.target }}</code>
+        </div>
+      </figure>
+    {% endif %}
+
+    {% for observation in preview.observations %}
+      <div class="preview-control">
+        <span class="control-mark" aria-hidden="true">✓</span>
+        <div>
+          <h3>Observed control</h3>
+          <p>{{ observation.title }}</p>
+          <code>{{ observation.affected_resources|join(", ") }}</code>
+        </div>
+      </div>
+    {% endfor %}
+
+    <details class="preview-coverage">
+      <summary>
+        <span>Analysis gaps &amp; coverage</span>
+        <span class="preview-gap-count">{{ preview.operation_gaps }} gaps reported</span>
+        <span class="details-marker" aria-hidden="true"></span>
+      </summary>
+      <dl>
+        <div><dt>Unsupported resources</dt><dd>{{ preview.summary.unsupported_resources }}</dd></div>
+        <div><dt>Unresolved references</dt><dd>{{ preview.unresolved_references }}</dd></div>
+      </dl>
+      <p>Coverage is limited to modeled resources and operations. <a href="{{ report_url }}#analysis-gaps">Review analysis scope</a>.</p>
+      <p class="preview-source">Fixture: <code>{{ preview.scenario.fixture_name }}</code></p>
+    </details>
+
+    <footer class="preview-footer">
+      <a href="{{ report_url }}">Open full report <span aria-hidden="true">↗</span></a>
+      <a href="{{ report_url }}#raw-outputs">JSON / Markdown <span aria-hidden="true">↗</span></a>
+    </footer>
+  {% else %}
+    <header class="workspace-heading">
+      <p class="eyebrow">Report preview</p>
+      <h2 id="preview-heading">Explore a built-in demo</h2>
+    </header>
+    <p class="empty-state">The example report is unavailable in this installation.</p>
+    <a href="{{ request.url_for('scenarios_page') }}">Browse available demos <span aria-hidden="true">→</span></a>
+  {% endif %}
+</section>
