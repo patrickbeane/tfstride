@@ -56,11 +56,9 @@
     {% if preview.boundary %}
       <figure class="preview-boundary">
         <figcaption>Trust boundary</figcaption>
-        <div class="boundary-crossing">
-          <code>{{ "Internet" if preview.boundary.source == "internet" else preview.boundary.source }}</code>
-          <span class="boundary-connector" aria-hidden="true">→</span><span class="sr-only">to</span>
-          <code>{{ preview.boundary.target }}</code>
-        </div>
+        {% with boundary = preview.boundary %}
+          {% include "_boundary_crossing.html" %}
+        {% endwith %}
       </figure>
     {% endif %}
 

@@ -1,0 +1,14 @@
+<dl class="boundary-crossing">
+  <div class="boundary-step">
+    <dt>Source</dt>
+    <dd><code>{{ "Internet" if boundary.source == "internet" else boundary.source }}</code></dd>
+  </div>
+  <div class="boundary-step boundary-relationship">
+    <dt><span class="boundary-arrow" aria-hidden="true">→</span>Relationship</dt>
+    <dd>{{ boundary.boundary_type }}</dd>
+  </div>
+  <div class="boundary-step">
+    <dt><span class="boundary-arrow" aria-hidden="true">→</span>Destination</dt>
+    <dd><code>{{ boundary.target }}</code></dd>
+  </div>
+</dl>

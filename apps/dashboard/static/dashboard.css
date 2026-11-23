@@ -366,6 +366,12 @@ h4 {
   justify-content: space-between;
   gap: 1rem;
   align-items: end;
+  overflow-wrap: anywhere;
+}
+
+.report-hero > div {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .report-hero h1 {
@@ -816,6 +822,7 @@ h4 {
   border-radius: var(--radius-lg);
   background: var(--surface-strong);
   border: 1px solid var(--line);
+  overflow-wrap: anywhere;
 }
 
 .finding-card + .finding-card,
@@ -889,6 +896,84 @@ h4 {
 .boundary-list {
   display: grid;
   gap: 0.9rem;
+}
+
+.preview-boundary,
+.boundary-card {
+  container-type: inline-size;
+}
+
+.boundary-crossing {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.4fr);
+  align-items: stretch;
+  gap: 1.25rem;
+  margin: 0;
+}
+
+.boundary-step {
+  position: relative;
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.boundary-step dt {
+  color: var(--muted);
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.boundary-step dd {
+  margin: 0.2rem 0 0;
+  color: var(--accent-strong);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.boundary-step code {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.74rem;
+}
+
+.boundary-relationship {
+  border-color: rgba(13, 92, 99, 0.25);
+  background: rgba(13, 92, 99, 0.06);
+}
+
+.boundary-arrow {
+  position: absolute;
+  top: 50%;
+  left: -1.25rem;
+  width: 1.25rem;
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 400;
+  line-height: 1;
+  text-align: center;
+  transform: translateY(-50%);
+}
+
+.boundary-rationale {
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+}
+
+@container (max-width: 23rem) {
+  .boundary-crossing {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .boundary-arrow {
+    top: -1.25rem;
+    left: 50%;
+    height: 1.25rem;
+    line-height: 1.25rem;
+    transform: translateX(-50%) rotate(90deg);
+  }
 }
 
 .empty-state {

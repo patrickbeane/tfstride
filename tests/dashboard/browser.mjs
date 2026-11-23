@@ -384,6 +384,37 @@ try {
   await navigate('/demo/ecs-fargate');
   assert(await evaluate('document.querySelectorAll(".finding-card").length > 0'));
   await screenshot('report-desktop.png');
+
+  // Long cross-account identifiers remain readable and match the actual report.
+  stage = 'trust boundaries';
+  await navigate('/demo/trust-unconstrained');
+  assert(await evaluate(`(() => {
+    const payload = JSON.parse(document.querySelector('#raw-outputs code').textContent);
+    const cards = [...document.querySelectorAll('.boundary-card')];
+    return cards.length > 0 && cards.length === payload.trust_boundaries.length && cards.every((card, index) => {
+      const boundary = payload.trust_boundaries[index];
+      const values = [...card.querySelectorAll('dd')].map(value => value.textContent.trim());
+      return JSON.stringify(values) === JSON.stringify([boundary.source, boundary.boundary_type, boundary.target])
+        && card.textContent.includes(boundary.rationale);
+    });
+  })()`));
+  for (const width of [1440, 390, 320]) {
+    await viewport(width);
+    await screenshot(`report-boundaries-${width}.png`);
+    const overflowing = await evaluate(`Array.from(document.querySelectorAll('main p, main li, main dd, main dt, main h1, main h2, main h3'))
+      .filter(element => element.scrollWidth > element.clientWidth && element.clientWidth > 0)
+      .map(element => element.tagName + '.' + element.className + ': ' + element.textContent.trim().slice(0, 100))`);
+    assert(
+      await evaluate('document.documentElement.scrollWidth <= innerWidth'),
+      `Report overflows at ${width}px: ${overflowing.join(', ')}. Screenshot: ${artifacts}`,
+    );
+    assert(
+      await evaluate('[...document.querySelectorAll(".boundary-step")].every(step => step.scrollWidth <= step.clientWidth)'),
+      `Boundary text overflows at ${width}px`,
+    );
+  }
+
+  await viewport(1440);
   for (const provider of ['aws', 'azure', 'gcp']) {
     await navigate(`/scenarios?provider=${provider}`);
     assert.equal(await evaluate('document.querySelector(".scenario-card").dataset.provider'), provider);

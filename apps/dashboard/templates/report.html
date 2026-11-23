@@ -329,10 +329,11 @@
         {% if payload.trust_boundaries %}
           <div class="boundary-list">
             {% for boundary in payload.trust_boundaries %}
-              <article class="boundary-card">
-                <h3>{{ boundary.boundary_type }}</h3>
-                <p><strong>{{ boundary.source }}</strong> -> <strong>{{ boundary.target }}</strong></p>
-                <p>{{ boundary.rationale }}</p>
+              <article class="boundary-card" aria-label="{{ boundary.boundary_type }}">
+                {% include "_boundary_crossing.html" %}
+                {% if boundary.rationale %}
+                  <p class="boundary-rationale"><strong>Rationale:</strong> {{ boundary.rationale }}</p>
+                {% endif %}
               </article>
             {% endfor %}
           </div>

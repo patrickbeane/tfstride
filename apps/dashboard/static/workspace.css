@@ -523,29 +523,8 @@ details[open] > summary .details-marker::before {
   margin: 0.35rem 0 1rem;
 }
 
-.boundary-crossing {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
+.preview-boundary .boundary-crossing {
   margin-top: 0.55rem;
-  color: var(--accent-strong);
-}
-
-.boundary-crossing code {
-  min-width: 0;
-}
-
-.boundary-connector {
-  flex: 1 0 1.5rem;
-  display: flex;
-  align-items: center;
-  color: var(--accent);
-}
-
-.boundary-connector::before {
-  content: "";
-  flex: 1;
-  border-top: 1px solid var(--accent);
 }
 
 .preview-control {
