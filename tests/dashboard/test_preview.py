@@ -110,7 +110,7 @@ class DashboardPreviewTests(unittest.TestCase):
             self.assertIn(finding["title"], response.text)
             self.assertIn(finding["rule_id"], response.text)
             self.assertIn(finding["evidence"][0]["values"][0], response.text)
-        self.assertIn(preview.boundary["target"], response.text)
+        self.assertIn(preview.boundary["target"], response.text.replace("<wbr>", ""))
         self.assertIn(preview.boundary["boundary_type"], response.text)
         self.assertIn(preview.observations[0]["title"], response.text)
         for section in ("findings", "analysis-gaps", "raw-outputs"):

@@ -905,16 +905,16 @@ h4 {
 
 .boundary-crossing {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.4fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.65fr) minmax(0, 1fr);
   align-items: stretch;
-  gap: 1.25rem;
+  gap: 1rem;
   margin: 0;
 }
 
 .boundary-step {
   position: relative;
   min-width: 0;
-  padding: 0.45rem 0.55rem;
+  padding: 0.4rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--surface);
@@ -932,11 +932,12 @@ h4 {
   font-size: 0.76rem;
   line-height: 1.45;
   overflow-wrap: anywhere;
+  word-break: normal;
 }
 
-.boundary-step code {
+.boundary-step dd code {
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 0.74rem;
+  font-size: 0.72rem;
 }
 
 .boundary-relationship {
@@ -947,8 +948,8 @@ h4 {
 .boundary-arrow {
   position: absolute;
   top: 50%;
-  left: -1.25rem;
-  width: 1.25rem;
+  left: -1rem;
+  width: 1rem;
   color: var(--accent);
   font-size: 0.9rem;
   font-weight: 400;
@@ -962,16 +963,16 @@ h4 {
   font-size: 0.85rem;
 }
 
-@container (max-width: 23rem) {
+@container (max-width: 27.5rem) {
   .boundary-crossing {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .boundary-arrow {
-    top: -1.25rem;
+    top: -1rem;
     left: 50%;
-    height: 1.25rem;
-    line-height: 1.25rem;
+    height: 1rem;
+    line-height: 1rem;
     transform: translateX(-50%) rotate(90deg);
   }
 }

@@ -398,7 +398,7 @@ try {
         && card.textContent.includes(boundary.rationale);
     });
   })()`));
-  for (const width of [1440, 390, 320]) {
+  for (const width of [1440, 1024, 768, 390, 320]) {
     await viewport(width);
     await screenshot(`report-boundaries-${width}.png`);
     const overflowing = await evaluate(`Array.from(document.querySelectorAll('main p, main li, main dd, main dt, main h1, main h2, main h3'))
