@@ -8,6 +8,7 @@ from pathlib import Path
 from tfstride.analysis.rule_registry import RuleMetadata, RuleRegistry, default_rule_registry
 from tfstride.app import AUTO_PROVIDER, TfStride
 from tfstride.config import ProjectConfigLoadError, load_project_config
+from tfstride.coverage_policy import CoverageCheck, CoveragePolicy, evaluate_coverage_policy
 from tfstride.filtering import FindingFilterLoadError, apply_finding_filters, render_baseline
 from tfstride.input.terraform_plan import TerraformPlanLoadError
 from tfstride.models import Severity
@@ -18,6 +19,7 @@ from tfstride.reporting.sarif import render_sarif
 
 INPUT_ERROR_EXIT_CODE = 2
 POLICY_VIOLATION_EXIT_CODE = 3
+COVERAGE_GATE_EXIT_CODE = 4
 RULE_CATALOG_KIND = "tfstride-rule-catalog"
 RULE_CATALOG_VERSION = "1.0"
 
@@ -95,6 +97,25 @@ def build_parser() -> argparse.ArgumentParser:
             "Useful for CI policy gating."
         ),
     )
+    parser.add_argument(
+        "--fail-on-coverage",
+        action="append",
+        choices=[check.value for check in CoverageCheck],
+        metavar="CHECK",
+        help=(
+            "Return exit code 4 when the analysis is incomplete in the given way. May be repeated. "
+            f"Choices: {', '.join(check.value for check in CoverageCheck)}. Replaces any `coverage.fail_on` config."
+        ),
+    )
+    parser.add_argument(
+        "--allow-unsupported-type",
+        action="append",
+        metavar="RESOURCE_TYPE",
+        help=(
+            "Resource type that `--fail-on-coverage unsupported-resources` should tolerate. May be repeated. "
+            "Replaces any `coverage.allow_unsupported_types` config."
+        ),
+    )
     return parser
 
 
@@ -124,6 +145,19 @@ def main(argv: list[str] | None = None) -> int:
         baseline_path = args.baseline or project_config.baseline_path
         fail_on = args.fail_on or (project_config.fail_on.value if project_config.fail_on else None)
 
+        coverage_policy = CoveragePolicy(
+            checks=(
+                frozenset(CoverageCheck(name) for name in args.fail_on_coverage)
+                if args.fail_on_coverage
+                else project_config.coverage_policy.checks
+            ),
+            allowed_unsupported_types=(
+                frozenset(args.allow_unsupported_type)
+                if args.allow_unsupported_type
+                else project_config.coverage_policy.allowed_unsupported_types
+            ),
+        )
+
         raw_result = engine.analyze_plan(plan_path, title=title)
         result = raw_result
         if suppressions_path:
@@ -151,23 +185,31 @@ def main(argv: list[str] | None = None) -> int:
     if args.sarif_output and sarif_report is not None:
         Path(args.sarif_output).write_text(sarif_report, encoding="utf-8")
 
-    if not fail_on:
-        return 0
+    findings_failed = False
+    if fail_on:
+        threshold = Severity(fail_on)
+        violating_findings = [finding for finding in result.findings if _meets_or_exceeds(finding.severity, threshold)]
+        if violating_findings:
+            findings_failed = True
+            summary = ", ".join(
+                f"{count} {severity.value}"
+                for severity in (Severity.HIGH, Severity.MEDIUM, Severity.LOW)
+                if (count := sum(1 for finding in violating_findings if finding.severity == severity))
+            )
+            sys.stderr.write(
+                f"Policy gate failed: {len(violating_findings)} finding(s) meet or exceed "
+                f"`{threshold.value}` ({summary}).\n"
+            )
 
-    threshold = Severity(fail_on)
-    violating_findings = [finding for finding in result.findings if _meets_or_exceeds(finding.severity, threshold)]
-    if not violating_findings:
-        return 0
+    coverage_violations = evaluate_coverage_policy(result.analysis_coverage, coverage_policy)
+    for violation in coverage_violations:
+        sys.stderr.write(f"Coverage gate failed ({violation.check.value}): {violation.message}.\n")
 
-    summary = ", ".join(
-        f"{count} {severity.value}"
-        for severity in (Severity.HIGH, Severity.MEDIUM, Severity.LOW)
-        if (count := sum(1 for finding in violating_findings if finding.severity == severity))
-    )
-    sys.stderr.write(
-        f"Policy gate failed: {len(violating_findings)} finding(s) meet or exceed `{threshold.value}` ({summary}).\n"
-    )
-    return POLICY_VIOLATION_EXIT_CODE
+    if findings_failed:
+        return POLICY_VIOLATION_EXIT_CODE
+    if coverage_violations:
+        return COVERAGE_GATE_EXIT_CODE
+    return 0
 
 
 def _meets_or_exceeds(severity: Severity, threshold: Severity) -> bool:

@@ -225,6 +225,10 @@ disable = ["aws-role-trust-expansion"]
 
 [rules.severity_overrides]
 aws-iam-wildcard-permissions = "low"
+
+[coverage]
+fail_on = ["no-resources", "unsupported-resources"]
+allow_unsupported_types = ["aws_cloudwatch_dashboard"]
 ```
 
 CLI flags override config values when both are present.
@@ -234,6 +238,20 @@ CLI flags override config values when both are present.
 Policy gating returns exit code `3` when findings meet or exceed the requested threshold.
 
 Plans that cannot be trusted as a complete picture are rejected as input errors (exit code `2`) rather than analyzed: plans marked `"errored": true` and plans whose `format_version` is not a `1.x` string. Older plans that omit these fields are still accepted.
+
+### Coverage gate
+
+`--fail-on` only looks at findings, so a plan that tfSTRIDE could not meaningfully analyze (an empty plan, or one containing only unsupported resource types) passes it. The opt-in coverage gate closes that gap. Pass `--fail-on-coverage` once per check, or set `coverage.fail_on` in `tfstride.toml`:
+
+| Check | Fails when |
+| --- | --- |
+| `no-resources` | no resources were analyzed |
+| `unsupported-resources` | the plan contains resource types tfSTRIDE does not support |
+| `unresolved-relationships` | modeled references or symbolic relationships were unresolved, ambiguous, or unsupported |
+
+Use `--allow-unsupported-type TYPE` (repeatable) or `coverage.allow_unsupported_types` to tolerate specific unsupported types, such as resources that carry no security-relevant relationships. `unresolved-relationships` can be noisy on first-apply plans, where many values are unknown until apply, so enable it deliberately.
+
+A coverage failure exits with code `4`, distinct from a findings failure (`3`). Both gates are always evaluated and both messages are printed; if both fail, the exit code is `3`. Passing `--fail-on-coverage` or `--allow-unsupported-type` replaces the corresponding config value rather than merging with it.
 
 Minimal pre-apply gate:
 

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from tfstride.analysis.rule_registry import RulePolicy, default_rule_registry
+from tfstride.coverage_policy import CoverageCheck, CoveragePolicy
 from tfstride.models import Severity
 
 CONFIG_FILENAME = "tfstride.toml"
@@ -25,6 +26,7 @@ class ProjectConfig:
     suppressions_path: str | None = None
     baseline_path: str | None = None
     rule_policy: RulePolicy = field(default_factory=RulePolicy)
+    coverage_policy: CoveragePolicy = field(default_factory=CoveragePolicy)
 
 
 def load_project_config(
@@ -48,7 +50,7 @@ def load_project_config(
 
     _ensure_known_keys(
         payload,
-        allowed={"version", "title", "provider", "fail_on", "baseline", "suppressions", "rules"},
+        allowed={"version", "title", "provider", "fail_on", "baseline", "suppressions", "rules", "coverage"},
         label="config",
         path=config_path,
     )
@@ -64,6 +66,7 @@ def load_project_config(
     baseline_path = _optional_path(payload.get("baseline"), key="baseline", base_path=config_path)
     suppressions_path = _optional_path(payload.get("suppressions"), key="suppressions", base_path=config_path)
     rule_policy = _load_rule_policy(payload.get("rules"), config_path)
+    coverage_policy = _load_coverage_policy(payload.get("coverage"), config_path)
 
     return ProjectConfig(
         path=str(config_path),
@@ -73,6 +76,7 @@ def load_project_config(
         suppressions_path=suppressions_path,
         baseline_path=baseline_path,
         rule_policy=rule_policy,
+        coverage_policy=coverage_policy,
     )
 
 
@@ -134,6 +138,32 @@ def _load_rule_policy(payload: Any, config_path: Path) -> RulePolicy:
     )
 
 
+def _load_coverage_policy(payload: Any, config_path: Path) -> CoveragePolicy:
+    if payload is None:
+        return CoveragePolicy()
+    if not isinstance(payload, dict):
+        raise ProjectConfigLoadError(f"`coverage` must be a TOML table in {config_path}")
+
+    _ensure_known_keys(
+        payload,
+        allowed={"fail_on", "allow_unsupported_types"},
+        label="coverage",
+        path=config_path,
+    )
+
+    checks: set[CoverageCheck] = set()
+    for index, name in enumerate(_string_list(payload, "fail_on", config_path, scope="coverage")):
+        try:
+            checks.add(CoverageCheck(name))
+        except ValueError as exc:
+            allowed = ", ".join(check.value for check in CoverageCheck)
+            raise ProjectConfigLoadError(
+                f"`coverage.fail_on[{index}]` must be one of {allowed} in {config_path}"
+            ) from exc
+    allowed_types = _string_list(payload, "allow_unsupported_types", config_path, scope="coverage")
+    return CoveragePolicy(checks=frozenset(checks), allowed_unsupported_types=frozenset(allowed_types))
+
+
 def _optional_string(value: Any, *, key: str, path: Path) -> str | None:
     if value is None:
         return None
@@ -163,13 +193,17 @@ def _optional_path(value: Any, *, key: str, base_path: Path) -> str | None:
 def _optional_string_list(payload: dict[str, Any], key: str, path: Path) -> list[str] | None:
     if key not in payload:
         return None
-    value = payload.get(key)
+    return _string_list(payload, key, path, scope="rules", noun="rule IDs")
+
+
+def _string_list(payload: dict[str, Any], key: str, path: Path, *, scope: str, noun: str = "strings") -> list[str]:
+    value = payload.get(key, [])
     if not isinstance(value, list):
-        raise ProjectConfigLoadError(f"`rules.{key}` must be an array of rule IDs in {path}")
+        raise ProjectConfigLoadError(f"`{scope}.{key}` must be an array of {noun} in {path}")
     parsed_values: list[str] = []
     for index, entry in enumerate(value):
         if not isinstance(entry, str) or not entry.strip():
-            raise ProjectConfigLoadError(f"`rules.{key}[{index}]` must be a non-empty string in {path}")
+            raise ProjectConfigLoadError(f"`{scope}.{key}[{index}]` must be a non-empty string in {path}")
         parsed_values.append(entry.strip())
     return parsed_values
 

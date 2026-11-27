@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from tfstride.config import CONFIG_FILENAME, ProjectConfigLoadError, load_project_config
+from tfstride.coverage_policy import CoverageCheck
 from tfstride.models import Severity
 
 
@@ -64,6 +65,60 @@ class ProjectConfigTests(unittest.TestCase):
 
             with self.assertRaises(ProjectConfigLoadError):
                 load_project_config(path=config_path)
+
+    def test_load_project_config_reads_coverage_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config_path = Path(tmp_dir) / CONFIG_FILENAME
+            config_path.write_text(
+                textwrap.dedent(
+                    """
+                    [coverage]
+                    fail_on = ["no-resources", "unsupported-resources"]
+                    allow_unsupported_types = ["aws_foo"]
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            config = load_project_config(path=config_path)
+
+        self.assertEqual(
+            config.coverage_policy.checks,
+            frozenset({CoverageCheck.NO_RESOURCES, CoverageCheck.UNSUPPORTED_RESOURCES}),
+        )
+        self.assertEqual(config.coverage_policy.allowed_unsupported_types, frozenset({"aws_foo"}))
+
+    def test_load_project_config_defaults_to_no_coverage_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config_path = Path(tmp_dir) / CONFIG_FILENAME
+            config_path.write_text('title = "No Coverage"\n', encoding="utf-8")
+
+            config = load_project_config(path=config_path)
+
+        self.assertEqual(config.coverage_policy.checks, frozenset())
+        self.assertEqual(config.coverage_policy.allowed_unsupported_types, frozenset())
+
+    def test_load_project_config_rejects_invalid_coverage_settings(self) -> None:
+        invalid_configs = {
+            "unknown check": ('[coverage]\nfail_on = ["everything"]\n', "`coverage.fail_on[0]`"),
+            "non-array checks": ('[coverage]\nfail_on = "no-resources"\n', "`coverage.fail_on` must be an array"),
+            "non-string type": (
+                "[coverage]\nallow_unsupported_types = [1]\n",
+                "`coverage.allow_unsupported_types[0]`",
+            ),
+            "unknown key": ("[coverage]\nfail = []\n", "Unknown coverage key(s)"),
+            "non-table": ('coverage = "yes"\n', "`coverage` must be a TOML table"),
+        }
+        for name, (content, expected_message) in invalid_configs.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp_dir:
+                config_path = Path(tmp_dir) / CONFIG_FILENAME
+                config_path.write_text(content, encoding="utf-8")
+
+                with self.assertRaises(ProjectConfigLoadError) as context:
+                    load_project_config(path=config_path)
+
+                self.assertIn(expected_message, str(context.exception))
 
 
 if __name__ == "__main__":

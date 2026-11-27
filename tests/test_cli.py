@@ -10,6 +10,7 @@ from pathlib import Path
 
 from tests.helpers.paths import FIXTURES_DIR
 from tfstride.cli import (
+    COVERAGE_GATE_EXIT_CODE,
     INPUT_ERROR_EXIT_CODE,
     POLICY_VIOLATION_EXIT_CODE,
     RULE_CATALOG_KIND,
@@ -447,6 +448,141 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertEqual("", stderr_buffer.getvalue())
+
+    def _run_with_plan(self, resources: list[dict[str, object]], *args: str) -> tuple[int, str]:
+        payload = {
+            "format_version": "1.2",
+            "terraform_version": "1.8.5",
+            "planned_values": {"root_module": {"resources": resources}},
+        }
+        stderr_buffer = io.StringIO()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            plan_path = Path(tmp_dir) / "plan.json"
+            plan_path.write_text(json.dumps(payload), encoding="utf-8")
+
+            with redirect_stdout(io.StringIO()), redirect_stderr(stderr_buffer):
+                exit_code = main([str(plan_path), "--quiet", *args])
+        return exit_code, stderr_buffer.getvalue()
+
+    @staticmethod
+    def _unsupported_resource(resource_type: str = "aws_foo_bar") -> dict[str, object]:
+        return {
+            "address": f"{resource_type}.x",
+            "mode": "managed",
+            "type": resource_type,
+            "name": "x",
+            "provider_name": "registry.terraform.io/hashicorp/aws",
+            "values": {},
+        }
+
+    def test_cli_coverage_gate_is_off_by_default(self) -> None:
+        exit_code, stderr = self._run_with_plan([self._unsupported_resource()], "--fail-on", "high")
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual("", stderr)
+
+    def test_cli_coverage_gate_fails_empty_plan(self) -> None:
+        exit_code, stderr = self._run_with_plan([], "--fail-on-coverage", "no-resources")
+
+        self.assertEqual(exit_code, COVERAGE_GATE_EXIT_CODE)
+        self.assertIn("Coverage gate failed", stderr)
+        self.assertIn("no resources were analyzed", stderr)
+
+    def test_cli_coverage_gate_fails_unsupported_only_plan_without_fail_on(self) -> None:
+        exit_code, stderr = self._run_with_plan(
+            [self._unsupported_resource()], "--fail-on-coverage", "unsupported-resources"
+        )
+
+        self.assertEqual(exit_code, COVERAGE_GATE_EXIT_CODE)
+        self.assertIn("aws_foo_bar (1)", stderr)
+
+    def test_cli_coverage_gate_allows_listed_unsupported_types(self) -> None:
+        exit_code, stderr = self._run_with_plan(
+            [self._unsupported_resource()],
+            "--fail-on-coverage",
+            "unsupported-resources",
+            "--allow-unsupported-type",
+            "aws_foo_bar",
+        )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual("", stderr)
+
+    def test_cli_coverage_gate_passes_for_fully_analyzed_plan(self) -> None:
+        stderr_buffer = io.StringIO()
+
+        with redirect_stdout(io.StringIO()), redirect_stderr(stderr_buffer):
+            exit_code = main(
+                [
+                    str(SAFE_FIXTURE_PATH),
+                    "--quiet",
+                    "--fail-on",
+                    "high",
+                    "--fail-on-coverage",
+                    "no-resources",
+                    "--fail-on-coverage",
+                    "unsupported-resources",
+                ]
+            )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual("", stderr_buffer.getvalue())
+
+    def test_cli_findings_gate_takes_precedence_and_both_failures_are_reported(self) -> None:
+        resources = [
+            {
+                "address": "aws_s3_bucket.public",
+                "mode": "managed",
+                "type": "aws_s3_bucket",
+                "name": "public",
+                "provider_name": "registry.terraform.io/hashicorp/aws",
+                "values": {"bucket": "public", "acl": "public-read"},
+            },
+            self._unsupported_resource(),
+        ]
+
+        exit_code, stderr = self._run_with_plan(
+            resources, "--fail-on", "low", "--fail-on-coverage", "unsupported-resources"
+        )
+
+        self.assertEqual(exit_code, POLICY_VIOLATION_EXIT_CODE)
+        self.assertIn("Policy gate failed", stderr)
+        self.assertIn("Coverage gate failed", stderr)
+
+    def test_cli_coverage_gate_reads_project_config_and_flags_override_it(self) -> None:
+        payload = {
+            "terraform_version": "1.8.5",
+            "planned_values": {"root_module": {"resources": [self._unsupported_resource()]}},
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            plan_path = Path(tmp_dir) / "plan.json"
+            plan_path.write_text(json.dumps(payload), encoding="utf-8")
+            config_path = Path(tmp_dir) / CONFIG_FILENAME
+            config_path.write_text('[coverage]\nfail_on = ["unsupported-resources"]\n', encoding="utf-8")
+
+            from_config = self._main_exit_code([str(plan_path), "--quiet", "--config", str(config_path)])
+            allowed_by_flag = self._main_exit_code(
+                [str(plan_path), "--quiet", "--config", str(config_path), "--allow-unsupported-type", "aws_foo_bar"]
+            )
+            checks_replaced_by_flag = self._main_exit_code(
+                [str(plan_path), "--quiet", "--config", str(config_path), "--fail-on-coverage", "no-resources"]
+            )
+
+        self.assertEqual(from_config, COVERAGE_GATE_EXIT_CODE)
+        self.assertEqual(allowed_by_flag, 0)
+        self.assertEqual(checks_replaced_by_flag, COVERAGE_GATE_EXIT_CODE)
+
+    @staticmethod
+    def _main_exit_code(argv: list[str]) -> int:
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            return main(argv)
+
+    def test_cli_rejects_unknown_coverage_check(self) -> None:
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit) as context:
+                main([str(SAFE_FIXTURE_PATH), "--fail-on-coverage", "everything"])
+
+        self.assertEqual(context.exception.code, 2)
 
     def test_cli_rejects_non_plan_json_with_input_error_exit_code(self) -> None:
         stdout_buffer = io.StringIO()
