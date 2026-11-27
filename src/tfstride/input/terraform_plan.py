@@ -7,6 +7,8 @@ from typing import Any
 from tfstride.input.configuration_references import attach_configuration_reference_resolutions
 from tfstride.models import TerraformPlan, TerraformResource
 
+SUPPORTED_FORMAT_MAJOR_VERSION = 1
+
 
 class TerraformPlanLoadError(ValueError):
     """Raised when an input file is not a usable Terraform plan JSON document."""
@@ -29,6 +31,8 @@ def load_terraform_plan(path: str | Path) -> TerraformPlan:
         raise TerraformPlanLoadError(
             f"Input is not a Terraform plan JSON document: missing `terraform_version` in {plan_path}"
         )
+
+    _validate_plan_status(payload, plan_path)
 
     planned_values = payload.get("planned_values")
     if not isinstance(planned_values, dict):
@@ -59,6 +63,34 @@ def load_terraform_plan(path: str | Path) -> TerraformPlan:
         terraform_version=terraform_version,
         resources=resources,
     )
+
+
+def _validate_plan_status(payload: dict[str, Any], plan_path: Path) -> None:
+    """Reject plans whose contents cannot be trusted as a complete picture of planned changes."""
+    if "format_version" in payload:
+        format_version = payload["format_version"]
+        if not _is_supported_format_version(format_version):
+            raise TerraformPlanLoadError(
+                f"Unsupported Terraform plan `format_version` {format_version!r} in {plan_path}: "
+                f"expected a `{SUPPORTED_FORMAT_MAJOR_VERSION}.x` version string"
+            )
+
+    if "errored" in payload:
+        errored = payload["errored"]
+        if not isinstance(errored, bool):
+            raise TerraformPlanLoadError(f"Terraform plan `errored` must be a boolean in {plan_path}")
+        if errored:
+            raise TerraformPlanLoadError(
+                f"Terraform plan in {plan_path} is marked `errored` and may be incomplete; "
+                "fix the planning errors and regenerate the plan"
+            )
+
+
+def _is_supported_format_version(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    major, separator, minor = value.partition(".")
+    return bool(separator) and major.isdecimal() and minor.isdecimal() and int(major) == SUPPORTED_FORMAT_MAJOR_VERSION
 
 
 def _collect_module_resources(

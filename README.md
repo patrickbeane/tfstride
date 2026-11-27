@@ -233,6 +233,8 @@ CLI flags override config values when both are present.
 
 Policy gating returns exit code `3` when findings meet or exceed the requested threshold.
 
+Plans that cannot be trusted as a complete picture are rejected as input errors (exit code `2`) rather than analyzed: plans marked `"errored": true` and plans whose `format_version` is not a `1.x` string. Older plans that omit these fields are still accepted.
+
 Minimal pre-apply gate:
 
 ```bash

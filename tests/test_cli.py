@@ -464,6 +464,33 @@ class CliTests(unittest.TestCase):
         self.assertIn("Input error:", stderr_buffer.getvalue())
         self.assertIn("missing `terraform_version`", stderr_buffer.getvalue())
 
+    def test_cli_rejects_errored_and_unsupported_plans_with_input_error_exit_code(self) -> None:
+        cases = (
+            ({"errored": True}, "errored"),
+            ({"format_version": "99.0"}, "format_version"),
+        )
+        for extra, expected_message in cases:
+            with self.subTest(extra=extra):
+                stdout_buffer = io.StringIO()
+                stderr_buffer = io.StringIO()
+                payload = {
+                    "terraform_version": "1.8.5",
+                    "planned_values": {"root_module": {"resources": []}},
+                    **extra,
+                }
+
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    plan_path = Path(tmp_dir) / "plan.json"
+                    plan_path.write_text(json.dumps(payload), encoding="utf-8")
+
+                    with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
+                        exit_code = main([str(plan_path), "--quiet", "--fail-on", "high"])
+
+                self.assertEqual(exit_code, INPUT_ERROR_EXIT_CODE)
+                self.assertEqual("", stdout_buffer.getvalue())
+                self.assertIn("Input error:", stderr_buffer.getvalue())
+                self.assertIn(expected_message, stderr_buffer.getvalue())
+
     def test_cli_rejects_invalid_suppressions_file_with_input_error_exit_code(self) -> None:
         stdout_buffer = io.StringIO()
         stderr_buffer = io.StringIO()

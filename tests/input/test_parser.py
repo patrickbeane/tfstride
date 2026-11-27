@@ -8,6 +8,14 @@ from pathlib import Path
 from tfstride.input.terraform_plan import TerraformPlanLoadError, load_terraform_plan
 
 
+def _minimal_plan_payload(**extra: object) -> dict[str, object]:
+    return {
+        "terraform_version": "1.8.5",
+        "planned_values": {"root_module": {"resources": []}},
+        **extra,
+    }
+
+
 class TerraformPlanParserTests(unittest.TestCase):
     def test_parser_collects_root_and_child_module_resources(self) -> None:
         payload = {
@@ -113,6 +121,65 @@ class TerraformPlanParserTests(unittest.TestCase):
                 load_terraform_plan(plan_path)
 
         self.assertIn("missing `terraform_version`", str(context.exception))
+
+    def test_parser_rejects_errored_plans(self) -> None:
+        payload = _minimal_plan_payload(errored=True)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            plan_path = Path(tmp_dir) / "plan.json"
+            plan_path.write_text(json.dumps(payload), encoding="utf-8")
+
+            with self.assertRaises(TerraformPlanLoadError) as context:
+                load_terraform_plan(plan_path)
+
+        self.assertIn("errored", str(context.exception))
+
+    def test_parser_accepts_non_errored_and_missing_errored_flag(self) -> None:
+        for extra in ({}, {"errored": False}):
+            with self.subTest(extra=extra):
+                payload = _minimal_plan_payload(**extra)
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    plan_path = Path(tmp_dir) / "plan.json"
+                    plan_path.write_text(json.dumps(payload), encoding="utf-8")
+                    plan = load_terraform_plan(plan_path)
+
+                self.assertEqual(plan.resources, [])
+
+    def test_parser_rejects_malformed_errored_flag(self) -> None:
+        for value in ("true", 1, None):
+            with self.subTest(value=value):
+                payload = _minimal_plan_payload(errored=value)
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    plan_path = Path(tmp_dir) / "plan.json"
+                    plan_path.write_text(json.dumps(payload), encoding="utf-8")
+
+                    with self.assertRaises(TerraformPlanLoadError) as context:
+                        load_terraform_plan(plan_path)
+
+                self.assertIn("`errored` must be a boolean", str(context.exception))
+
+    def test_parser_accepts_supported_and_missing_format_versions(self) -> None:
+        for extra in ({}, {"format_version": "1.0"}, {"format_version": "1.2"}, {"format_version": "1.99"}):
+            with self.subTest(extra=extra):
+                payload = _minimal_plan_payload(**extra)
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    plan_path = Path(tmp_dir) / "plan.json"
+                    plan_path.write_text(json.dumps(payload), encoding="utf-8")
+                    plan = load_terraform_plan(plan_path)
+
+                self.assertEqual(plan.resources, [])
+
+    def test_parser_rejects_unsupported_format_versions(self) -> None:
+        for value in ("99.0", "2.0", "0.2", "1", "1.x", "", 1.2, None):
+            with self.subTest(value=value):
+                payload = _minimal_plan_payload(format_version=value)
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    plan_path = Path(tmp_dir) / "plan.json"
+                    plan_path.write_text(json.dumps(payload), encoding="utf-8")
+
+                    with self.assertRaises(TerraformPlanLoadError) as context:
+                        load_terraform_plan(plan_path)
+
+                self.assertIn("format_version", str(context.exception))
 
     def test_parser_rejects_malformed_resource_entries(self) -> None:
         malformed_payloads = [
