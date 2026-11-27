@@ -549,33 +549,83 @@ class CliTests(unittest.TestCase):
         self.assertIn("Policy gate failed", stderr)
         self.assertIn("Coverage gate failed", stderr)
 
-    def test_cli_coverage_gate_reads_project_config_and_flags_override_it(self) -> None:
+    @staticmethod
+    def _supported_resource() -> dict[str, object]:
+        return {
+            "address": "aws_s3_bucket.logs",
+            "mode": "managed",
+            "type": "aws_s3_bucket",
+            "name": "logs",
+            "provider_name": "registry.terraform.io/hashicorp/aws",
+            "values": {"bucket": "logs"},
+        }
+
+    def _run_with_config(self, config_toml: str, resources: list[dict[str, object]], *args: str) -> tuple[int, str]:
         payload = {
             "terraform_version": "1.8.5",
-            "planned_values": {"root_module": {"resources": [self._unsupported_resource()]}},
+            "planned_values": {"root_module": {"resources": resources}},
         }
+        stderr_buffer = io.StringIO()
         with tempfile.TemporaryDirectory() as tmp_dir:
             plan_path = Path(tmp_dir) / "plan.json"
             plan_path.write_text(json.dumps(payload), encoding="utf-8")
             config_path = Path(tmp_dir) / CONFIG_FILENAME
-            config_path.write_text('[coverage]\nfail_on = ["unsupported-resources"]\n', encoding="utf-8")
+            config_path.write_text(config_toml, encoding="utf-8")
 
-            from_config = self._main_exit_code([str(plan_path), "--quiet", "--config", str(config_path)])
-            allowed_by_flag = self._main_exit_code(
-                [str(plan_path), "--quiet", "--config", str(config_path), "--allow-unsupported-type", "aws_foo_bar"]
-            )
-            checks_replaced_by_flag = self._main_exit_code(
-                [str(plan_path), "--quiet", "--config", str(config_path), "--fail-on-coverage", "no-resources"]
-            )
+            with redirect_stdout(io.StringIO()), redirect_stderr(stderr_buffer):
+                exit_code = main([str(plan_path), "--quiet", "--config", str(config_path), *args])
+        return exit_code, stderr_buffer.getvalue()
 
-        self.assertEqual(from_config, COVERAGE_GATE_EXIT_CODE)
-        self.assertEqual(allowed_by_flag, 0)
-        self.assertEqual(checks_replaced_by_flag, COVERAGE_GATE_EXIT_CODE)
+    def test_cli_coverage_gate_reads_project_config(self) -> None:
+        config = '[coverage]\nfail_on = ["unsupported-resources"]\n'
 
-    @staticmethod
-    def _main_exit_code(argv: list[str]) -> int:
-        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
-            return main(argv)
+        exit_code, stderr = self._run_with_config(config, [self._unsupported_resource()])
+
+        self.assertEqual(exit_code, COVERAGE_GATE_EXIT_CODE)
+        self.assertIn("unsupported-resources", stderr)
+
+    def test_cli_fail_on_coverage_flag_replaces_configured_checks(self) -> None:
+        # The mixed plan fails `unsupported-resources` but passes `no-resources`, so the exit
+        # code distinguishes replacement (0) from merging (4).
+        config = '[coverage]\nfail_on = ["unsupported-resources"]\n'
+        resources = [self._supported_resource(), self._unsupported_resource()]
+
+        configured_exit_code, _ = self._run_with_config(config, resources)
+        replaced_exit_code, replaced_stderr = self._run_with_config(
+            config, resources, "--fail-on-coverage", "no-resources"
+        )
+
+        self.assertEqual(configured_exit_code, COVERAGE_GATE_EXIT_CODE)
+        self.assertEqual(replaced_exit_code, 0)
+        self.assertEqual("", replaced_stderr)
+
+    def test_cli_allow_unsupported_type_flag_replaces_configured_allowlist(self) -> None:
+        config = '[coverage]\nfail_on = ["unsupported-resources"]\nallow_unsupported_types = ["aws_foo_bar"]\n'
+        resources = [self._unsupported_resource("aws_foo_bar")]
+
+        configured_exit_code, _ = self._run_with_config(config, resources)
+        replaced_exit_code, replaced_stderr = self._run_with_config(
+            config, resources, "--allow-unsupported-type", "aws_other"
+        )
+
+        self.assertEqual(configured_exit_code, 0)
+        self.assertEqual(replaced_exit_code, COVERAGE_GATE_EXIT_CODE)
+        self.assertIn("aws_foo_bar (1)", replaced_stderr)
+
+    def test_cli_allowlisting_every_unsupported_type_does_not_satisfy_no_resources(self) -> None:
+        exit_code, stderr = self._run_with_plan(
+            [self._unsupported_resource()],
+            "--fail-on-coverage",
+            "no-resources",
+            "--fail-on-coverage",
+            "unsupported-resources",
+            "--allow-unsupported-type",
+            "aws_foo_bar",
+        )
+
+        self.assertEqual(exit_code, COVERAGE_GATE_EXIT_CODE)
+        self.assertIn("(no-resources)", stderr)
+        self.assertNotIn("(unsupported-resources)", stderr)
 
     def test_cli_rejects_unknown_coverage_check(self) -> None:
         with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):

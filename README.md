@@ -249,7 +249,7 @@ Plans that cannot be trusted as a complete picture are rejected as input errors 
 | `unsupported-resources` | the plan contains resource types tfSTRIDE does not support |
 | `unresolved-relationships` | modeled references or symbolic relationships were unresolved, ambiguous, or unsupported |
 
-Use `--allow-unsupported-type TYPE` (repeatable) or `coverage.allow_unsupported_types` to tolerate specific unsupported types, such as resources that carry no security-relevant relationships. `unresolved-relationships` can be noisy on first-apply plans, where many values are unknown until apply, so enable it deliberately.
+Use `--allow-unsupported-type TYPE` (repeatable) or `coverage.allow_unsupported_types` to tolerate specific unsupported types, such as resources that carry no security-relevant relationships. Allowlisting unsupported types does not satisfy `no-resources`: if nothing was analyzed, that check still fails even when every unsupported type is allowed. `unresolved-relationships` can be noisy on first-apply plans, where many values are unknown until apply, so enable it deliberately.
 
 A coverage failure exits with code `4`, distinct from a findings failure (`3`). Both gates are always evaluated and both messages are printed; if both fail, the exit code is `3`. Passing `--fail-on-coverage` or `--allow-unsupported-type` replaces the corresponding config value rather than merging with it.
 

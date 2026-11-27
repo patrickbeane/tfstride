@@ -55,6 +55,16 @@ class CoveragePolicyTests(unittest.TestCase):
 
         self.assertEqual(len(violations), 1)
 
+    def test_allowed_unsupported_types_do_not_satisfy_no_resources_check(self) -> None:
+        policy = CoveragePolicy(
+            checks=frozenset({CoverageCheck.NO_RESOURCES, CoverageCheck.UNSUPPORTED_RESOURCES}),
+            allowed_unsupported_types=frozenset({"aws_foo"}),
+        )
+
+        violations = evaluate_coverage_policy(_coverage(normalized=0, unsupported_types={"aws_foo": 1}), policy)
+
+        self.assertEqual([violation.check for violation in violations], [CoverageCheck.NO_RESOURCES])
+
     def test_unsupported_resources_check_lists_types_and_counts(self) -> None:
         policy = CoveragePolicy(checks=frozenset({CoverageCheck.UNSUPPORTED_RESOURCES}))
 
