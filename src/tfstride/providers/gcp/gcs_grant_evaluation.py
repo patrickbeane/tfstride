@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Literal, NotRequired, TypedDict, cast
 
 from tfstride.models import NormalizedResource
@@ -17,8 +17,10 @@ from tfstride.providers.gcp.custom_role_index import GcpCustomRoleIndex, build_g
 from tfstride.providers.gcp.gcs_custom_role_evaluation import assess_inherited_gcs_custom_role
 from tfstride.providers.gcp.gcs_grant_constraints import GcsPermissionConstraint, gcs_permission_constraints
 from tfstride.providers.gcp.gcs_project_grants import (
+    BucketIamManager,
     ancestor_grant_candidates,
     bucket_grant_candidates,
+    bucket_iam_managers,
     project_grant_candidates,
     project_reference_index,
 )
@@ -125,6 +127,11 @@ class GcsGrantConstraintContext:
     projects: ResourceReferenceIndex
     custom_roles: GcpCustomRoleIndex
     deny_policies: tuple[NormalizedResource, ...]
+    # Managers depend on the bucket, not the principal. Entries keep the bucket they were computed for
+    # so a different object with the same address is recomputed instead of reusing stale selections.
+    _bucket_managers: dict[str, tuple[NormalizedResource, tuple[BucketIamManager, ...]]] = field(
+        default_factory=dict, init=False, repr=False, compare=False
+    )
 
     @classmethod
     def build(cls, resources: Sequence[NormalizedResource]) -> GcsGrantConstraintContext:
@@ -141,8 +148,15 @@ class GcsGrantConstraintContext:
             ),
         )
 
+    def bucket_managers(self, bucket: NormalizedResource) -> tuple[BucketIamManager, ...]:
+        cached = self._bucket_managers.get(bucket.address)
+        if cached is None or cached[0] is not bucket:
+            cached = (bucket, bucket_iam_managers(bucket, self.resources, self.index))
+            self._bucket_managers[bucket.address] = cached
+        return cached[1]
+
     def bindings(self, principal: str, bucket: NormalizedResource) -> tuple[list[dict[str, object]], list[str]]:
-        local, local_problems = bucket_grant_candidates(principal, bucket, self.resources, self.index)
+        local, local_problems = bucket_grant_candidates(principal, bucket, self.bucket_managers(bucket))
         inherited, problems = project_grant_candidates(
             principal, bucket, self.resources, self.projects, self.custom_roles
         )

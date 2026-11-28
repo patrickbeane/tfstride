@@ -180,14 +180,20 @@ def ancestor_grant_candidates(
     return grants, problems
 
 
-def bucket_grant_candidates(
-    principal: str,
+BucketIamManager = tuple[NormalizedResource, bool | None]
+
+
+def bucket_iam_managers(
     bucket: NormalizedResource,
     sources: Sequence[NormalizedResource],
     index: GcpResourceIndex,
-) -> tuple[list[dict[str, Any]], list[str]]:
-    """Resolve current bucket IAM sources; decorated binding copies are not authority."""
-    managers: list[tuple[NormalizedResource, bool | None]] = []
+) -> tuple[BucketIamManager, ...]:
+    """Select the bucket IAM sources that manage this bucket, with whether each scope resolved to it.
+
+    The result depends on the bucket and the inventory but not on any principal, so callers
+    evaluating many principals against one bucket can select once and reuse it.
+    """
+    managers: list[BucketIamManager] = []
     for source in sources:
         if source.resource_type not in GCP_STORAGE_BUCKET_IAM_RESOURCE_TYPES:
             continue
@@ -215,6 +221,19 @@ def bucket_grant_candidates(
         if target is not None and target.address != bucket.address:
             continue
         managers.append((source, True if target is not None else None))
+    return tuple(managers)
+
+
+def bucket_grant_candidates(
+    principal: str,
+    bucket: NormalizedResource,
+    managers: Sequence[BucketIamManager],
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Resolve current bucket IAM managers; decorated binding copies are not authority.
+
+    A manager that names other principals still belongs to `managers`: authoritative
+    managers conflict regardless of which principal is being evaluated.
+    """
     grants: list[dict[str, Any]] = []
     problems: list[str] = []
     for source, matches in managers:

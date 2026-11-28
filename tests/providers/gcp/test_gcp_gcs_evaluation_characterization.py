@@ -156,8 +156,21 @@ class GcpGcsEvaluationCharacterizationTests(unittest.TestCase):
         self.assertTrue(result.findings)
         self.assertGreater(counts["grant_binding_queries"], 0)
         self.assertLessEqual(counts["distinct_grant_binding_queries"], counts["grant_binding_queries"])
-        # Every query scans the full inventory, so scans are queries times resources.
-        self.assertEqual(counts["grant_source_scans"], counts["grant_binding_queries"] * len(resources))
+        self.assertLessEqual(counts["grant_source_scans"], counts["grant_binding_queries"] * len(resources))
+
+    def test_manager_selection_scans_are_bounded_by_buckets_not_queries(self) -> None:
+        engine = TfStride()
+        for workloads in (4, 12, 24):
+            resources = build_benchmark_resources(workloads, "gcs")
+            buckets = sum(1 for resource in resources if resource.resource_type == "google_storage_bucket")
+            with self.subTest(workloads=workloads), plan_file(resources) as path:
+                _, counts = analyze_with_counts(path, engine, grant_queries=True)
+
+                self.assertGreater(counts["grant_binding_queries"], counts["gcs_context_builds"] * buckets)
+                # Each context selects managers once per bucket, however many principals ask about it.
+                self.assertLessEqual(
+                    counts["grant_source_scans"], counts["gcs_context_builds"] * buckets * len(resources)
+                )
 
     def test_bucket_free_analysis_makes_no_grant_queries(self) -> None:
         with plan_file(build_benchmark_resources(4, "pubsub")) as path:

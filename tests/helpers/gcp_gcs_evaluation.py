@@ -14,7 +14,7 @@ from unittest.mock import patch
 from tfstride.app import TfStride
 from tfstride.models import AnalysisResult, NormalizedResource, TerraformResource
 from tfstride.providers.gcp.gcs_grant_evaluation import GcsGrantConstraintContext
-from tfstride.providers.gcp.gcs_project_grants import bucket_grant_candidates
+from tfstride.providers.gcp.gcs_project_grants import BucketIamManager, bucket_iam_managers
 from tfstride.providers.gcp.resource_index import GcpResourceIndex, GcpResourceIndexBuilder
 
 
@@ -64,7 +64,7 @@ class _GrantQueryStats:
 
 @contextmanager
 def _count_grant_queries(stats: _GrantQueryStats) -> Iterator[None]:
-    """Count local grant-source selection work performed through `GcsGrantConstraintContext.bindings`."""
+    """Count grant queries and the IAM-source scanning done to select each bucket's managers."""
     original_bindings = GcsGrantConstraintContext.bindings
 
     def counting_bindings(
@@ -75,18 +75,17 @@ def _count_grant_queries(stats: _GrantQueryStats) -> Iterator[None]:
         stats.distinct.add((id(self), principal, bucket.address))
         return original_bindings(self, principal, bucket)
 
-    def counting_candidates(
-        principal: str,
+    def counting_managers(
         bucket: NormalizedResource,
         sources: Sequence[NormalizedResource],
         index: GcpResourceIndex,
-    ) -> tuple[list[dict[str, object]], list[str]]:
+    ) -> tuple[BucketIamManager, ...]:
         stats.source_scans += len(sources)
-        return bucket_grant_candidates(principal, bucket, sources, index)
+        return bucket_iam_managers(bucket, sources, index)
 
     with (
         patch.object(GcsGrantConstraintContext, "bindings", counting_bindings),
-        patch("tfstride.providers.gcp.gcs_grant_evaluation.bucket_grant_candidates", counting_candidates),
+        patch("tfstride.providers.gcp.gcs_grant_evaluation.bucket_iam_managers", counting_managers),
     ):
         yield
 

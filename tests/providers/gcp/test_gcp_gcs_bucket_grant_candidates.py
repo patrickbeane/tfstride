@@ -7,14 +7,19 @@ without changing which sources apply, conflict, or stay unresolved.
 
 from __future__ import annotations
 
+import copy
 import json
 import unittest
+from unittest.mock import patch
 
 from tests.providers.gcp.normalizer_support import _terraform_resource
 from tests.providers.gcp.test_gcp_cloud_run_gcs_access_paths import _PROJECT, _SERVICE_ACCOUNT_MEMBER
-from tfstride.models import TerraformResource
+from tfstride.models import NormalizedResource, TerraformResource
 from tfstride.providers.gcp.gcs_grant_evaluation import GcsGrantConstraintContext
+from tfstride.providers.gcp.gcs_project_grants import bucket_iam_managers
+from tfstride.providers.gcp.metadata import GcpResourceMetadata
 from tfstride.providers.gcp.normalizer import GcpNormalizer
+from tfstride.providers.gcp.resource_facts import gcp_facts
 from tfstride.providers.gcp.resource_types import GcpResourceType
 
 _ORDERS = "google_storage_bucket.orders"
@@ -444,6 +449,59 @@ class GcpGcsBucketGrantCandidateTests(unittest.TestCase):
                 [],
             ),
         )
+
+
+class GcpGcsBucketManagerReuseTests(unittest.TestCase):
+    @staticmethod
+    def _context(
+        iam_sources: list[TerraformResource],
+    ) -> tuple[GcsGrantConstraintContext, list[NormalizedResource]]:
+        inventory = GcpNormalizer().normalize([*_buckets(), *iam_sources])
+        buckets = list(inventory.by_type(GcpResourceType.STORAGE_BUCKET))
+        return GcsGrantConstraintContext.build(inventory.resources), buckets
+
+    def test_managers_are_selected_once_per_bucket_however_many_principals_ask(self) -> None:
+        context, buckets = self._context([_member("mine"), _member("theirs", member=_OTHER_MEMBER)])
+        self.assertEqual(len(buckets), 2)
+
+        with patch(
+            "tfstride.providers.gcp.gcs_grant_evaluation.bucket_iam_managers", wraps=bucket_iam_managers
+        ) as selection:
+            for _ in range(3):
+                for principal in (_SERVICE_ACCOUNT_MEMBER, _OTHER_MEMBER, "user:nobody@example.com"):
+                    for bucket in buckets:
+                        context.bindings(principal, bucket)
+
+        self.assertEqual(selection.call_count, 2)
+
+    def test_reused_selection_matches_a_fresh_context_for_every_principal_and_bucket(self) -> None:
+        sources = [
+            _member("mine"),
+            _binding("theirs", members=(_OTHER_MEMBER,), role=_CREATOR),
+            _member("elsewhere", bucket=f"{_OTHER}.name", role=_CREATOR),
+        ]
+        reused, buckets = self._context(sources)
+
+        for principal in (_SERVICE_ACCOUNT_MEMBER, _OTHER_MEMBER):
+            for bucket in buckets:
+                fresh, fresh_buckets = self._context(sources)
+                fresh_bucket = next(item for item in fresh_buckets if item.address == bucket.address)
+                with self.subTest(principal=principal, bucket=bucket.address):
+                    self.assertEqual(reused.bindings(principal, bucket), fresh.bindings(principal, fresh_bucket))
+
+    def test_a_different_bucket_object_with_the_same_address_is_reselected(self) -> None:
+        context, buckets = self._context([_member("native", bucket=f"projects/_/buckets/{_ORDERS_NAME}")])
+        bucket = next(item for item in buckets if item.address == _ORDERS)
+
+        before, _ = context.bindings(_SERVICE_ACCOUNT_MEMBER, bucket)
+        renamed = copy.deepcopy(bucket)
+        gcp_facts(renamed).set(GcpResourceMetadata.BUCKET_NAME, "renamed-bucket")
+        after, _ = context.bindings(_SERVICE_ACCOUNT_MEMBER, renamed)
+        again, _ = context.bindings(_SERVICE_ACCOUNT_MEMBER, bucket)
+
+        self.assertEqual([grant["source"] for grant in before], [_address("member", "native")])
+        self.assertEqual(after, [])
+        self.assertEqual(again, before)
 
 
 if __name__ == "__main__":
