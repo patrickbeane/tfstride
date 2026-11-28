@@ -85,6 +85,23 @@ def _policy(name: str, *, bucket: str = f"{_ORDERS}.name", role: str = _VIEWER) 
     )
 
 
+def _manager(
+    kind: str,
+    name: str,
+    values: dict[str, object],
+    *,
+    unknown: dict[str, object] | None = None,
+) -> TerraformResource:
+    """Build an IAM manager with exactly the supplied values, including partial or unresolved ones."""
+    resource_type = f"google_storage_bucket_iam_{kind}"
+    return _terraform_resource(
+        f"{resource_type}.{name}",
+        resource_type,
+        {"bucket": f"{_ORDERS}.name", **values},
+        unknown_values=unknown,
+    )
+
+
 def _condition(title: str) -> dict[str, str]:
     return {"title": title, "expression": f'request.time < timestamp("{title}")'}
 
@@ -251,6 +268,182 @@ class GcpGcsBucketGrantCandidateTests(unittest.TestCase):
         grants, problems = _query(sources, bucket=_OTHER)
         self.assertEqual(grants, [])
         self.assertEqual(len(problems), 2)
+
+    def test_binding_with_an_unknown_role_is_unresolved_and_blocks_other_managers(self) -> None:
+        unresolved = _manager(
+            "binding", "unknown_role", {"role": "", "members": [_SERVICE_ACCOUNT_MEMBER]}, unknown={"role": True}
+        )
+
+        self.assertEqual(
+            _query([unresolved, _member("extra", role=_CREATOR)]),
+            (
+                [],
+                [
+                    f"{_address('binding', 'unknown_role')} for {_ORDERS}: "
+                    "bucket IAM role, membership, or condition is unresolved",
+                    f"{_address('member', 'extra')} for {_ORDERS}: overlapping authoritative bucket IAM managers",
+                ],
+            ),
+        )
+
+    def test_binding_without_a_role_blocks_other_managers_without_a_problem_of_its_own(self) -> None:
+        roleless = _manager("binding", "roleless", {"members": [_SERVICE_ACCOUNT_MEMBER]})
+
+        self.assertEqual(
+            _query([roleless, _member("extra", role=_CREATOR)]),
+            ([], [f"{_address('member', 'extra')} for {_ORDERS}: overlapping authoritative bucket IAM managers"]),
+        )
+
+    def test_binding_with_an_unknown_condition_conflicts_on_the_same_role(self) -> None:
+        conditional = _manager(
+            "binding",
+            "conditional",
+            {"role": _VIEWER, "members": [_SERVICE_ACCOUNT_MEMBER], "condition": [_condition("2030-01-01")]},
+            unknown={"condition": True},
+        )
+
+        self.assertEqual(
+            _query([conditional, _member("extra", role=_VIEWER)]),
+            (
+                [],
+                [
+                    f"{_address('binding', 'conditional')} for {_ORDERS}: "
+                    "bucket IAM role, membership, or condition is unresolved",
+                    f"{_address('member', 'extra')} for {_ORDERS}: overlapping authoritative bucket IAM managers",
+                ],
+            ),
+        )
+
+    def test_binding_with_no_members_conflicts_with_every_other_manager_regardless_of_role(self) -> None:
+        # Current behavior: an empty authoritative binding has no role to compare, so it blocks all managers.
+        empty = _manager("binding", "empty", {"role": _CREATOR, "members": []})
+
+        self.assertEqual(
+            _query([empty, _member("extra", role=_VIEWER)]),
+            ([], [f"{_address('member', 'extra')} for {_ORDERS}: overlapping authoritative bucket IAM managers"]),
+        )
+
+    def test_binding_with_unknown_members_conflicts_only_on_the_same_role(self) -> None:
+        for role, expected_grants in ((_CREATOR, [(_address("member", "extra"), _VIEWER)]), (_VIEWER, [])):
+            with self.subTest(binding_role=role):
+                unknown_members = _manager(
+                    "binding", "unknown_members", {"role": role, "members": []}, unknown={"members": True}
+                )
+
+                grants, problems = _query([unknown_members, _member("extra", role=_VIEWER)])
+
+                self.assertEqual(grants, expected_grants)
+                self.assertEqual(
+                    problems,
+                    []
+                    if expected_grants
+                    else [
+                        f"{_address('member', 'extra')} for {_ORDERS}: overlapping authoritative bucket IAM managers"
+                    ],
+                )
+
+    def test_member_with_an_unresolved_role_or_condition_is_a_problem(self) -> None:
+        unresolved_fields: list[dict[str, object]] = [{"role": True}, {"condition": True}]
+        for unknown in unresolved_fields:
+            with self.subTest(unknown=unknown):
+                values: dict[str, object] = {"member": _SERVICE_ACCOUNT_MEMBER}
+                if "condition" in unknown:
+                    values |= {"role": _VIEWER, "condition": [_condition("2030-01-01")]}
+                source = _manager("member", "unresolved", values, unknown=unknown)
+
+                self.assertEqual(
+                    _query([source]),
+                    (
+                        [],
+                        [
+                            f"{_address('member', 'unresolved')} for {_ORDERS}: "
+                            "bucket IAM role, membership, or condition is unresolved"
+                        ],
+                    ),
+                )
+
+    def test_member_with_an_unknown_principal_is_ignored_without_a_problem(self) -> None:
+        # Current behavior: unresolved membership cannot be matched to the principal, so it reports nothing.
+        source = _manager("member", "unknown_member", {"role": _VIEWER}, unknown={"member": True})
+
+        self.assertEqual(_query([source]), ([], []))
+
+    def test_policy_with_a_valid_binding_is_a_grant_when_it_is_the_only_manager(self) -> None:
+        self.assertEqual(_query([_policy("policy")]), ([(_address("policy", "policy"), _VIEWER)], []))
+
+    def test_policy_with_unsupported_binding_structure_is_a_problem(self) -> None:
+        malformed = _manager(
+            "policy",
+            "malformed",
+            {
+                "policy_data": json.dumps(
+                    {"bindings": [{"role": _VIEWER, "members": [_SERVICE_ACCOUNT_MEMBER], "extra": 1}]}
+                )
+            },
+        )
+
+        self.assertEqual(
+            _query([malformed]),
+            (
+                [],
+                [
+                    f"{_address('policy', 'malformed')} for {_ORDERS}: bucket IAM policy contains unsupported binding structure"
+                ],
+            ),
+        )
+
+    def test_policy_with_unknown_data_reports_nothing_alone_but_blocks_other_managers(self) -> None:
+        unknown_policy = _manager("policy", "unknown", {}, unknown={"policy_data": True})
+
+        self.assertEqual(_query([unknown_policy]), ([], []))
+        self.assertEqual(
+            _query([unknown_policy, _member("extra")]),
+            ([], [f"{_address('member', 'extra')} for {_ORDERS}: overlapping authoritative bucket IAM managers"]),
+        )
+
+    def test_custom_roles_conflict_only_when_their_role_strings_are_identical(self) -> None:
+        project_role = f"projects/{_PROJECT}/roles/storageOperator"
+        organization_role = "organizations/123/roles/storageOperator"
+        conflict = [
+            f"{_address('binding', 'managed')} for {_ORDERS}: overlapping authoritative bucket IAM managers",
+            f"{_address('member', 'extra')} for {_ORDERS}: overlapping authoritative bucket IAM managers",
+        ]
+
+        self.assertEqual(
+            _query([_binding("managed", role=project_role), _member("extra", role=project_role)]),
+            ([], conflict),
+        )
+        self.assertEqual(
+            _query([_binding("managed", role=project_role), _member("extra", role=organization_role)]),
+            (
+                [(_address("binding", "managed"), project_role), (_address("member", "extra"), organization_role)],
+                [],
+            ),
+        )
+
+    def test_custom_role_aliases_are_not_recognized_as_conflicts_at_bucket_scope(self) -> None:
+        # Current behavior, not an endorsement: bucket-local selection compares role strings without the
+        # custom-role index, so a Terraform reference and the native name of one role do not conflict.
+        role = _terraform_resource(
+            "google_project_iam_custom_role.storage_operator",
+            GcpResourceType.PROJECT_IAM_CUSTOM_ROLE,
+            {
+                "project": _PROJECT,
+                "role_id": "storageOperator",
+                "name": f"projects/{_PROJECT}/roles/storageOperator",
+                "permissions": ["storage.objects.get"],
+            },
+        )
+        by_reference = f"{role.address}.name"
+        by_native_name = f"projects/{_PROJECT}/roles/storageOperator"
+
+        self.assertEqual(
+            _query([role, _binding("managed", role=by_reference), _member("extra", role=by_native_name)]),
+            (
+                [(_address("binding", "managed"), by_reference), (_address("member", "extra"), by_native_name)],
+                [],
+            ),
+        )
 
 
 if __name__ == "__main__":
