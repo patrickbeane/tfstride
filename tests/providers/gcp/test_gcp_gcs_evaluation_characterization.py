@@ -141,6 +141,31 @@ class GcpGcsEvaluationCharacterizationTests(unittest.TestCase):
             unknown["cloud_run_gcs_access_path_uncertainties"],
         )
 
+    def test_grant_query_counts_are_opt_in_and_internally_consistent(self) -> None:
+        engine = TfStride()
+        resources = build_benchmark_resources(4, "gcs")
+        with plan_file(resources) as path:
+            _, default_counts = analyze_with_counts(path, engine)
+            result, counts = analyze_with_counts(path, engine, grant_queries=True)
+
+        self.assertEqual(set(default_counts), {"gcs_context_builds", "gcp_resource_index_builds"})
+        self.assertEqual(
+            set(counts) - set(default_counts),
+            {"grant_binding_queries", "distinct_grant_binding_queries", "grant_source_scans"},
+        )
+        self.assertTrue(result.findings)
+        self.assertGreater(counts["grant_binding_queries"], 0)
+        self.assertLessEqual(counts["distinct_grant_binding_queries"], counts["grant_binding_queries"])
+        # Every query scans the full inventory, so scans are queries times resources.
+        self.assertEqual(counts["grant_source_scans"], counts["grant_binding_queries"] * len(resources))
+
+    def test_bucket_free_analysis_makes_no_grant_queries(self) -> None:
+        with plan_file(build_benchmark_resources(4, "pubsub")) as path:
+            _, counts = analyze_with_counts(path, TfStride(), grant_queries=True)
+
+        self.assertEqual(counts["grant_binding_queries"], 0)
+        self.assertEqual(counts["grant_source_scans"], 0)
+
     def test_bucket_free_analysis_constructs_no_grant_contexts_as_workloads_grow(self) -> None:
         engine = TfStride()
         for workloads in (10, 30):

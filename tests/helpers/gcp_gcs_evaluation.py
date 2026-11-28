@@ -4,16 +4,18 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterator, Sequence
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
+from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 from unittest.mock import patch
 
 from tfstride.app import TfStride
-from tfstride.models import AnalysisResult, TerraformResource
+from tfstride.models import AnalysisResult, NormalizedResource, TerraformResource
 from tfstride.providers.gcp.gcs_grant_evaluation import GcsGrantConstraintContext
-from tfstride.providers.gcp.resource_index import GcpResourceIndexBuilder
+from tfstride.providers.gcp.gcs_project_grants import bucket_grant_candidates
+from tfstride.providers.gcp.resource_index import GcpResourceIndex, GcpResourceIndexBuilder
 
 
 def plan_payload(resources: Sequence[TerraformResource]) -> dict[str, Any]:
@@ -51,19 +53,75 @@ def plan_file(resources: Sequence[TerraformResource]) -> Iterator[Path]:
         yield path
 
 
-def analyze_with_counts(path: Path, engine: TfStride) -> tuple[AnalysisResult, dict[str, int]]:
+@dataclass(slots=True)
+class _GrantQueryStats:
+    queries: int = 0
+    source_scans: int = 0
+    # Hold contexts so object ids stay unique for the whole measured analysis.
+    contexts: dict[int, GcsGrantConstraintContext] = field(default_factory=dict)
+    distinct: set[tuple[int, str, str]] = field(default_factory=set)
+
+
+@contextmanager
+def _count_grant_queries(stats: _GrantQueryStats) -> Iterator[None]:
+    """Count local grant-source selection work performed through `GcsGrantConstraintContext.bindings`."""
+    original_bindings = GcsGrantConstraintContext.bindings
+
+    def counting_bindings(
+        self: GcsGrantConstraintContext, principal: str, bucket: NormalizedResource
+    ) -> tuple[list[dict[str, object]], list[str]]:
+        stats.queries += 1
+        stats.contexts[id(self)] = self
+        stats.distinct.add((id(self), principal, bucket.address))
+        return original_bindings(self, principal, bucket)
+
+    def counting_candidates(
+        principal: str,
+        bucket: NormalizedResource,
+        sources: Sequence[NormalizedResource],
+        index: GcpResourceIndex,
+    ) -> tuple[list[dict[str, object]], list[str]]:
+        stats.source_scans += len(sources)
+        return bucket_grant_candidates(principal, bucket, sources, index)
+
+    with (
+        patch.object(GcsGrantConstraintContext, "bindings", counting_bindings),
+        patch("tfstride.providers.gcp.gcs_grant_evaluation.bucket_grant_candidates", counting_candidates),
+    ):
+        yield
+
+
+def analyze_with_counts(
+    path: Path, engine: TfStride, *, grant_queries: bool = False
+) -> tuple[AnalysisResult, dict[str, int]]:
     """Measure one complete analysis, including normalization, rules, and gap collection.
 
     Wrappers call the real constructors. Benchmarks time a separate unpatched run.
+    With `grant_queries`, also report how often grants are queried and how many IAM
+    sources those queries scan; the extra counts are omitted otherwise so recorded
+    constructor baselines keep their shape.
     """
-    with (
-        patch.object(GcsGrantConstraintContext, "build", wraps=GcsGrantConstraintContext.build) as contexts,
-        patch.object(
-            GcpResourceIndexBuilder,
-            "build",
-            autospec=True,
-            side_effect=GcpResourceIndexBuilder.build,
-        ) as indexes,
-    ):
+    stats = _GrantQueryStats()
+    with ExitStack() as stack:
+        contexts = stack.enter_context(
+            patch.object(GcsGrantConstraintContext, "build", wraps=GcsGrantConstraintContext.build)
+        )
+        indexes = stack.enter_context(
+            patch.object(
+                GcpResourceIndexBuilder,
+                "build",
+                autospec=True,
+                side_effect=GcpResourceIndexBuilder.build,
+            )
+        )
+        if grant_queries:
+            stack.enter_context(_count_grant_queries(stats))
         result = engine.analyze_plan(path)
-    return result, {"gcs_context_builds": contexts.call_count, "gcp_resource_index_builds": indexes.call_count}
+    counts = {"gcs_context_builds": contexts.call_count, "gcp_resource_index_builds": indexes.call_count}
+    if grant_queries:
+        counts |= {
+            "grant_binding_queries": stats.queries,
+            "distinct_grant_binding_queries": len(stats.distinct),
+            "grant_source_scans": stats.source_scans,
+        }
+    return result, counts
